@@ -1,0 +1,24 @@
+# Build output
+/build/
+out/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Visual Studio / MSVC
+.vs/
+*.user
+*.suo
+*.vcxproj.user
+*.aps
+CMakeSettings.json
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake-build-*/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
