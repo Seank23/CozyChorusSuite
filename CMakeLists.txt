@@ -39,14 +39,11 @@ juce_add_plugin(CozyChorusSuite
     VST3_CATEGORIES             Fx Modulation
     AU_MAIN_TYPE                kAudioUnitType_Effect)
 
-# Listed once here so target_sources and the source_group at EOF stay in sync;
-# add new Source/ files to this list as milestones land.
-set(COZY_SOURCES
-    Source/PluginProcessor.cpp
-    Source/PluginProcessor.h
-    Source/Parameters.h
-    Source/dsp/ModulationEffect.h
-    Source/dsp/NullEffect.h)
+# CONFIGURE_DEPENDS re-runs the glob at build time, so new Source/ files are picked
+# up without editing CMake. Feeds both target_sources and the source_group at EOF.
+file(GLOB_RECURSE COZY_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.h")
 
 target_sources(CozyChorusSuite PRIVATE ${COZY_SOURCES})
 
@@ -107,3 +104,21 @@ endforeach()
 # Press F5 -> launch the standalone app (rather than CMake's ALL_BUILD default).
 set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     PROPERTY VS_STARTUP_PROJECT CozyChorusSuite_Standalone)
+
+# ---------------------------------------------------------------------------
+# Docs project
+#
+# A build-free utility target that just lists the Markdown docs so they are
+# browsable/editable in Solution Explorer. add_custom_target(... SOURCES ...)
+# registers files for the IDE only — .md has no compile step, and without the
+# ALL keyword this target is never part of the default build. GLOB with
+# CONFIGURE_DEPENDS re-scans at build time, so new docs appear on their own.
+# ---------------------------------------------------------------------------
+file(GLOB COZY_ROOT_DOCS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.md")
+file(GLOB COZY_SUB_DOCS  CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/*.md")
+
+add_custom_target(Docs SOURCES ${COZY_ROOT_DOCS} ${COZY_SUB_DOCS})
+
+# Root docs (CLAUDE.md, DEVLOG.md, ...) sit at the project root; the docs/ folder
+# gets its own filter mirroring the on-disk layout.
+source_group("docs" FILES ${COZY_SUB_DOCS})

@@ -9,8 +9,8 @@ works in mono and stereo. C++20 / JUCE 8 / CMake.
 
 ## Current status
 
-- **Phase:** Milestone 0 complete — scaffolding builds, loads, and passes audio unchanged.
-  Milestone 1 (Chorus) is next.
+- **Phase:** Milestone 1 complete — Chorus is implemented and audible (delay-line family).
+  Milestone 2 (Flanger) is next.
 - Builds as **VST3 + Standalone** via CMake + JUCE **8.0.14** with the `Visual Studio 18 2026`
   generator (MSVC v145). Artefacts land in
   `build/CozyChorusSuite_artefacts/<config>/{Standalone,VST3}/`.
@@ -80,7 +80,10 @@ Fixed order (delay-line family first, then all-pass family):
 1. **Milestone 0 — Scaffolding. ✅ Done.** Empty plugin that loads and passes audio
    unchanged. APVTS with `mix` + `effectType`; `ModulationEffect` base + `NullEffect`
    pass-through; `GenericAudioProcessorEditor`.
-2. **Milestone 1 — Chorus.** First real effect (delay-line family).
+2. **Milestone 1 — Chorus. ✅ Done.** First real effect (delay-line family): shared `LFO` +
+   `ChorusEffect` (fractional `DelayLine`, Rate/Depth/Mix/Width, per-channel LFO phase offset
+   for stereo width, all params smoothed). `Voices` control and LFO shape exist in code but are
+   not yet wired/exposed.
 3. **Milestone 2 — Flanger.** Reuses the chorus delay line + feedback + shorter base delay.
 4. **Milestone 3 — Phaser.** All-pass cascade (new core).
 5. **Milestone 4 — Vibe.** Phaser variant, staggered stages + asymmetric LFO (hardest, last).
@@ -143,9 +146,9 @@ Source/
   Parameters.h               // parameter IDs + APVTS layout in one place
   dsp/
     ModulationEffect.h       // abstract base: Prepare(spec) / Process(context) / Reset()
-    NullEffect.h             // pass-through effect; M0 default until real effects land
-    LFO.h / .cpp             // shared LFO: sine/triangle, rate in Hz, per-channel phase offset, phase continuous across blocks (Milestone 1)
-    ChorusEffect.h / .cpp    // Milestone 1
+    NullEffect.h             // pass-through; still the fallback for effects not yet built (Flanger/Phaser/Vibe)
+    LFO.h / .cpp             // shared LFO: continuous phase, per-channel phase-offset reads, Hz rate; sine/triangle/saw/square implemented (Chorus uses sine)
+    ChorusEffect.h / .cpp    // Chorus (delay-line family) — Milestone 1, done
     // FlangerEffect, PhaserEffect, VibeEffect added in later milestones
   // PluginEditor.h/.cpp — deferred to the GUI phase; createEditor() returns GenericAudioProcessorEditor
 ```
@@ -168,8 +171,16 @@ All four are driven by a shared **LFO** and share **Rate / Depth / Mix / Stereo*
 - **LFO** is a single shared class **instanced by each effect** (not one processor-owned
   instance) — allows per-channel / per-voice phase offsets and vibe's asymmetric shape.
 - **`ModulationEffect` base interface:** `Prepare(const juce::dsp::ProcessSpec&)`,
-  `Process(const juce::dsp::ProcessContextReplacing<float>&)`, `Reset()`. Per-block parameter
-  passing (atomic-backed struct or APVTS atomic pointers) is added in M1 when Chorus needs it.
+  `Process(const juce::dsp::ProcessContextReplacing<float>&)`, `Reset()`.
+- **Parameter passing (settled M1):** the processor caches APVTS atomic pointers and, each block,
+  builds a plain per-effect POD (`ChorusParameters`, percentages converted to 0–1) and hands it to
+  `ChorusEffect::SetParameters`, which feeds per-control `SmoothedValue`s. Effects expose their own
+  `SetParameters(const XxxParameters&)` rather than reading the APVTS directly.
+- **Stereo width = LFO phase offset (M1):** both channels read one continuous LFO; the right
+  channel is read at `+width*0.25` cycle (up to 90° at 100%), so Width 0 % ⇒ mono-correlated.
+  Chorus is a bipolar sine around a 20 ms base delay, ±7 ms at full depth.
+- **Sources are globbed:** `CMakeLists.txt` uses `file(GLOB_RECURSE … CONFIGURE_DEPENDS)` over
+  `Source/*.cpp|*.h`, so new files are collected on the next build with no CMake edit.
 - **`PluginProcessor`** owns the APVTS and one instance of each effect; an `effectType`
   choice parameter selects which effect `processBlock` dispatches to (all → `NullEffect` in M0).
 - Start with **`GenericAudioProcessorEditor`**; custom GUI is a later phase.
@@ -213,6 +224,10 @@ width, continuous phase across blocks.
 | Stereo Width | 0–100% | L/R LFO phase offset |
 
 Smooth Rate, Depth, Mix, Width with `SmoothedValue`.
+
+**Shipped M1:** single voice (`Voices` control present but the ensemble is not yet wired); LFO is
+sine (triangle/saw/square exist in `LFO` but aren't user-selectable yet). Base delay 20 ms, ±7 ms
+modulation, params smoothed over 20 ms.
 
 ### Flanger (later — delay family)
 Reuse chorus delay line. Base delay **0.5–5 ms**; add **Feedback** (−0.95…+0.95) and

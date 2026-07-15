@@ -20,6 +20,43 @@ belongs here.
 
 ---
 
+## 2026-07-16 — Session 4: Milestone 1 — Chorus
+
+**Done:**
+- Implemented the first real effect. New `Source/dsp/LFO.{h,cpp}` (continuous-phase oscillator:
+  sine/triangle/saw/square, Hz rate, per-channel phase-offset reads) and
+  `Source/dsp/ChorusEffect.{h,cpp}` (fractional `DelayLine<float, Lagrange3rd>`, 20 ms base
+  delay, ±7 ms LFO modulation, per-channel width offset; Rate/Depth/Mix/Width all `SmoothedValue`).
+- Wired it into `PluginProcessor`: caches the Rate/Depth/Mix/Width APVTS atomic pointers, builds a
+  `ChorusParameters` POD per block (percentages → 0–1) via `SetParameters`, dispatches
+  `EffectType::Chorus` → `m_ChorusEffect`. Added `rate`/`depth`/`width`/`voices` to the APVTS
+  layout (`Parameters.h`).
+- Switched `CMakeLists.txt` source collection to `file(GLOB_RECURSE … CONFIGURE_DEPENDS)` over
+  `Source/`, so new files auto-include — no more hand-maintained `COZY_SOURCES` list.
+- Debugged the "no output when Chorus is selected" report (user's implementation, user fixed):
+  the wet/dry sample was read into an `int`, truncating all |x|<1 audio to 0 — total silence.
+  Same pass moved to a true fractional delay (the modulated delay was cast to `int`, wasting the
+  Lagrange interpolation) and fixed the `Voices` parameter's mislabelled name.
+
+**Decisions:**
+- Parameter passing (settled): the processor owns the APVTS atomic pointers and builds a per-effect
+  POD each block; the effect smooths internally. Effects never touch the APVTS directly.
+- Stereo width = LFO phase offset: right channel read at `+width*0.25` cycle (≤90°); 0 % ⇒ mono.
+- Chorus ships as a single bipolar-sine voice; `Voices` (1–3 ensemble) and selectable LFO shape
+  are present in code but intentionally left unwired for now.
+
+**Next up:**
+- Audition Chorus in the standalone host + a DAW (listen for zipper noise / RT-safety), then commit
+  M1 as one commit — it folds in Session 3's CMake solution-tidy and this session's glob change.
+- Milestone 2 (Flanger): reuse the delay line with feedback + a shorter 0.5–5 ms base delay.
+
+**Open questions / blockers:**
+- Ensemble (`Voices` > 1) and selectable LFO shape deferred — confirm they belong to a later
+  Chorus polish pass rather than M1.
+- No `pluginval` / automated DSP test yet; verification is still a manual audition on this box.
+
+---
+
 ## 2026-07-15 — Session 3: Fresh-PC setup + Visual Studio solution tidy-up
 
 **Done:**
