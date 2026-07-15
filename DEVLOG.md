@@ -20,6 +20,42 @@ belongs here.
 
 ---
 
+## 2026-07-15 — Session 3: Fresh-PC setup + Visual Studio solution tidy-up
+
+**Done:**
+- Brought the repo up on this box: populated the JUCE submodule (JUCE/ @ 8.0.14) and
+  reconfigured `build/` with the `Visual Studio 18 2026` generator (CMake 4.4 emits a
+  `.slnx`, the new XML solution format — not a `.sln`).
+- Organised the generated Visual Studio solution entirely from `CMakeLists.txt` (hand-edits
+  to the `.slnx` are clobbered on every configure / ZERO_CHECK run):
+  - `USE_FOLDERS ON` + `PREDEFINED_TARGETS_FOLDER "Build (auto-generated)"` — CMake's own
+    ALL_BUILD / ZERO_CHECK / INSTALL now collapse into one bucket.
+  - Format wrappers → `Formats/`; the `_All` / `_rc_lib` / `_vst3_helper` plumbing →
+    `Build (auto-generated)/`. The editable **`CozyChorusSuite`** code target is hoisted to
+    the solution root (`FOLDER ""`) so it is the most prominent project.
+  - `source_group(TREE Source ...)` mirrors the on-disk `Source/` tree in its own filter.
+  - `set(JUCE_ENABLE_MODULE_SOURCE_GROUPS ON …)` — JUCE's own option groups all module
+    sources under a collapsed **"JUCE Modules"** filter (headers marked header-only), so the
+    project shows just two top-level filters: `Source` and `JUCE Modules`.
+  - `VS_STARTUP_PROJECT` → `CozyChorusSuite_Standalone` (F5 launches the standalone app).
+- Verified by inspecting the regenerated `.slnx` and `.vcxproj.filters`. Configure is green;
+  a full compile on this PC has **not** been run yet.
+
+**Decisions:**
+- Solution layout lives in `CMakeLists.txt`, never hand-edited in the `.slnx`.
+- Chose JUCE's `JUCE_ENABLE_MODULE_SOURCE_GROUPS` (shows all module files, tidily grouped)
+  over the default (only ~22 unity `.cpp` files, but dumped in the generic "Source Files"
+  filter). One-line toggle if the leaner view is preferred later.
+
+**Next up:**
+- Full build on this box (CLI or in VS), audition M0 pass-through, then Milestone 1 (Chorus).
+
+**Open questions / blockers:**
+- The CMake solution-tidy changes are **uncommitted** — fold into the M1 commit or commit
+  separately per the "one commit per milestone" rule (user's call).
+
+---
+
 ## 2026-07-14 — Session 2: Milestone 0 — scaffolding
 
 **Done:**

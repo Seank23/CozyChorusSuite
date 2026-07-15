@@ -83,8 +83,10 @@ namespace CozyChorus
 	void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 	{
 		if (auto xml = getXmlFromBinary(data, sizeInBytes))
+		{
 			if (xml->hasTagName(m_APVTS.state.getType()))
 				m_APVTS.replaceState(juce::ValueTree::fromXml(*xml));
+		}
 	}
 }
 
