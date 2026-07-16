@@ -63,6 +63,7 @@ namespace CozyChorus
 		std::atomic<float>* m_DepthParam = nullptr;
 		std::atomic<float>* m_MixParam = nullptr;
 		std::atomic<float>* m_WidthParam = nullptr;
+		std::atomic<float>* m_VoicesParam = nullptr;
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 	};

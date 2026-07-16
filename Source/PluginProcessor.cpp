@@ -13,6 +13,7 @@ namespace CozyChorus
 		m_DepthParam = m_APVTS.getRawParameterValue(ParameterIDs::Depth);
 		m_MixParam = m_APVTS.getRawParameterValue(ParameterIDs::Mix);
 		m_WidthParam = m_APVTS.getRawParameterValue(ParameterIDs::Width);
+		m_VoicesParam = m_APVTS.getRawParameterValue(ParameterIDs::Voices);
 	}
 
 	void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -78,6 +79,7 @@ namespace CozyChorus
 		params.Depth = std::clamp(m_DepthParam->load() / 100.0f, 0.0f, 1.0f);
 		params.Mix = std::clamp(m_MixParam->load() / 100.0f, 0.0f, 1.0f);
 		params.Width = std::clamp(m_WidthParam->load() / 100.0f, 0.0f, 1.0f);
+		params.Voices = static_cast<int>(m_VoicesParam->load());
 		m_ChorusEffect.SetParameters(params);
 
 		GetActiveEffect().Process(context);

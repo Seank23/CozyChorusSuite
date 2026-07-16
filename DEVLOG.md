@@ -20,6 +20,45 @@ belongs here.
 
 ---
 
+## 2026-07-16 — Session 5: Chorus voices ensemble + stereo-width fix
+
+**Done:**
+- Wired the `Voices` (1–3) control end-to-end (user implemented, guided review): the processor now
+  caches the `voices` APVTS pointer and fills `ChorusParameters::Voices`; `ChorusEffect` smooths it
+  and reads the delay line as **N summed taps** — one `pushSample`, then N `popSample`s per
+  sample/channel with `updateReadPointer = true` on **only the last tap** so read/write pointers
+  stay in lockstep — normalised by `1/voices`.
+- Made the ensemble actually audible: each voice gets its **own base delay**, spread ±4 ms around
+  the 20 ms centre (`m_BaseDelayMs + (v − (voices−1)/2)·4 ms`), plus even LFO phase spread
+  (`v/voices`). Previously all voices shared one base delay + rate, so extra voices were nearly
+  inaudible.
+- **Fixed the stereo-width bug:** the width phase offset was being added to *both* channels
+  identically, so L/R stayed correlated and the Width knob did nothing. Now applied per-channel
+  (right channel only, `+width*0.25` cycle) on top of the per-voice phase, restoring the widening.
+- Cleanups: removed a duplicated/shadowed `voices` read; restored push-then-pop ordering to match
+  the original single-tap path.
+
+**Decisions:**
+- Ensemble = single shared LFO with per-voice **phase offset + base-delay spread**, same rate.
+  True per-voice detune (independent rates) would need one `LFO` instance per voice — deferred.
+- `Voices` is smoothed as a float then truncated to int; an abrupt click when the voice count
+  changes mid-audio is accepted for now (per-voice gain crossfade deferred).
+- Confirmed `Voices` is now part of M1 rather than a later polish pass — supersedes Session 4's
+  "shipped single-voice, Voices left unwired" note.
+
+**Next up:**
+- Audition the updated Chorus (voices 1→3; Width sweep in **stereo / on headphones** — width is a
+  decorrelation effect and won't show in a mono sum), then commit M1.
+- Milestone 2 (Flanger): reuse the delay line with feedback + a shorter 0.5–5 ms base delay.
+
+**Open questions / blockers:**
+- `CLAUDE.md` still describes M1 as single-voice with `Voices` unwired — now stale, refresh before
+  the M1 commit.
+- Selectable LFO shape still unwired; changing voice count mid-audio can click (no crossfade yet).
+- No `pluginval` / automated DSP test; verification is still a manual audition on this box.
+
+---
+
 ## 2026-07-16 — Session 4: Milestone 1 — Chorus
 
 **Done:**

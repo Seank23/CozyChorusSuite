@@ -29,7 +29,7 @@ namespace CozyChorus
 		juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> m_DelayLine;
 		LFO m_LFO;
 
-		juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> m_RateHz, m_Depth, m_Mix, m_Width;
+		juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> m_RateHz, m_Depth, m_Mix, m_Width, m_Voices;
 
 		double m_SampleRate = 44100.0;
 		float m_BaseDelayMs = 20.0f;
