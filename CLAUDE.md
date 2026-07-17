@@ -9,8 +9,10 @@ works in mono and stereo. C++20 / JUCE 8 / CMake.
 
 ## Current status
 
-- **Phase:** Milestone 1 complete — Chorus is implemented and audible (delay-line family).
-  Milestone 2 (Flanger) is next.
+- **Phase:** Milestone 2 complete — Chorus + Flanger are implemented and audible (both delay-line
+  family). Milestone 3 (Phaser, all-pass family) is next.
+- A hand-written **`CCSAudioProcessorEditor`** (rotary knobs + effect selector, per-effect control
+  visibility) has replaced the generic editor. Custom `LookAndFeel` / LFO visualiser still deferred.
 - Builds as **VST3 + Standalone** via CMake + JUCE **8.0.14** with the `Visual Studio 18 2026`
   generator (MSVC v145). Artefacts land in
   `build/CozyChorusSuite_artefacts/<config>/{Standalone,VST3}/`.
@@ -81,14 +83,19 @@ Fixed order (delay-line family first, then all-pass family):
    unchanged. APVTS with `mix` + `effectType`; `ModulationEffect` base + `NullEffect`
    pass-through; `GenericAudioProcessorEditor`.
 2. **Milestone 1 — Chorus. ✅ Done.** First real effect (delay-line family): shared `LFO` +
-   `ChorusEffect` (fractional `DelayLine`, Rate/Depth/Mix/Width, per-channel LFO phase offset
-   for stereo width, all params smoothed). `Voices` control and LFO shape exist in code but are
-   not yet wired/exposed.
-3. **Milestone 2 — Flanger.** Reuses the chorus delay line + feedback + shorter base delay.
+   `ChorusEffect` (fractional `DelayLine`, Rate/Depth/Mix/Width + a 1–3-voice ensemble, per-channel
+   LFO phase offset for stereo width, all params smoothed). `Voices` is wired and exposed (added
+   post-M1 in Session 5); selectable LFO shape still exists in code but is not user-selectable.
+3. **Milestone 2 — Flanger. ✅ Done.** Reuses the delay-line skeleton with **feedback** + a shorter
+   **0.5–5 ms base delay**: `FlangerEffect` (pop-before-push feedback comb;
+   Rate/Depth/Mix/Width/Feedback/BaseDelay, all smoothed). A custom `CCSAudioProcessorEditor`
+   (`Source/Editor/`) landed alongside — effect selector + rotary knobs, per-effect control
+   visibility. See the Flanger notes below for shipped tuning caveats.
 4. **Milestone 3 — Phaser.** All-pass cascade (new core).
 5. **Milestone 4 — Vibe.** Phaser variant, staggered stages + asymmetric LFO (hardest, last).
-6. **GUI — deferred.** Custom `LookAndFeel`, per-effect panels, LFO visualiser (possibly OpenGL),
-   only after the DSP is solid.
+6. **GUI — in progress (functional).** A parameter-driven `CCSAudioProcessorEditor` now ships
+   (rotary knobs, effect selector, per-effect control visibility). Still deferred: custom
+   `LookAndFeel`, polished per-effect panels, and an LFO visualiser (possibly OpenGL).
 
 ---
 
@@ -144,13 +151,15 @@ own naming, and the **JUCE submodule is never restyled**.
 Source/
   PluginProcessor.h / .cpp   // AudioProcessor: owns APVTS + effect instances; routes processBlock to active effect
   Parameters.h               // parameter IDs + APVTS layout in one place
+  Editor/
+    CCSAudioProcessorEditor.h / .cpp  // custom editor: effect selector + rotary knobs, per-effect control visibility (30 Hz Timer), wrapping-grid layout; createEditor() returns this
   dsp/
     ModulationEffect.h       // abstract base: Prepare(spec) / Process(context) / Reset()
-    NullEffect.h             // pass-through; still the fallback for effects not yet built (Flanger/Phaser/Vibe)
-    LFO.h / .cpp             // shared LFO: continuous phase, per-channel phase-offset reads, Hz rate; sine/triangle/saw/square implemented (Chorus uses sine)
+    NullEffect.h             // pass-through; still the fallback for effects not yet built (Phaser/Vibe)
+    LFO.h / .cpp             // shared LFO: continuous phase, per-channel phase-offset reads, Hz rate; sine/triangle/saw/square implemented (Chorus + Flanger use sine)
     ChorusEffect.h / .cpp    // Chorus (delay-line family) — Milestone 1, done
-    // FlangerEffect, PhaserEffect, VibeEffect added in later milestones
-  // PluginEditor.h/.cpp — deferred to the GUI phase; createEditor() returns GenericAudioProcessorEditor
+    FlangerEffect.h / .cpp   // Flanger (delay-line family, feedback comb) — Milestone 2, done
+    // PhaserEffect, VibeEffect added in later milestones
 ```
 
 ### Design principle: two DSP families, one shared skeleton
@@ -182,8 +191,21 @@ All four are driven by a shared **LFO** and share **Rate / Depth / Mix / Stereo*
 - **Sources are globbed:** `CMakeLists.txt` uses `file(GLOB_RECURSE … CONFIGURE_DEPENDS)` over
   `Source/*.cpp|*.h`, so new files are collected on the next build with no CMake edit.
 - **`PluginProcessor`** owns the APVTS and one instance of each effect; an `effectType`
-  choice parameter selects which effect `processBlock` dispatches to (all → `NullEffect` in M0).
-- Start with **`GenericAudioProcessorEditor`**; custom GUI is a later phase.
+  choice parameter selects which effect `processBlock` dispatches to (Phaser/Vibe → `NullEffect`
+  until built).
+- **Flanger topology (M2):** the delay-line skeleton reused as a **feedback comb** — per sample
+  `popSample` (read the modulated delay) **then** `pushSample(input + feedback·wet)`, i.e. read
+  before write, so the minimum effective delay is 1 sample (hence `MIN_DELAY_SAMPLES = 1`). Base
+  delay 0.5–5 ms; the LFO sweeps the delay **upward** from base by up to +5 ms (`0.5 + 0.5·sin`,
+  unipolar); feedback ±0.95; stereo width reuses the Chorus per-channel phase-offset trick.
+  Rate/Depth/Mix/Width are the **same APVTS params** as Chorus (shared controls); Feedback + Base
+  Delay are Flanger-only.
+- **Editor (M2):** replaced `GenericAudioProcessorEditor` with a hand-written
+  `CCSAudioProcessorEditor` (`Source/Editor/`). One shared set of rotary sliders + an effect
+  selector; a 30 Hz `Timer` watches the `effectType` param and shows/hides the per-effect controls
+  (Voices for Chorus; Feedback + Base Delay for Flanger). `resized()` lays the *visible* controls out
+  in a wrapping grid; `paint()` fills the background and draws the title + a caption above each
+  visible knob. No custom `LookAndFeel` yet — a later polish pass.
 
 ---
 
@@ -225,13 +247,38 @@ width, continuous phase across blocks.
 
 Smooth Rate, Depth, Mix, Width with `SmoothedValue`.
 
-**Shipped M1:** single voice (`Voices` control present but the ensemble is not yet wired); LFO is
-sine (triangle/saw/square exist in `LFO` but aren't user-selectable yet). Base delay 20 ms, ±7 ms
-modulation, params smoothed over 20 ms.
+**Shipped M1 (+ Session 5):** 1–3-voice ensemble wired and exposed — one shared LFO with a per-voice
+phase offset + base-delay spread (±4 ms around the 20 ms centre), N summed delay taps normalised by
+`1/voices`. LFO is sine (triangle/saw/square exist in `LFO` but aren't user-selectable yet). Base
+delay 20 ms, ±7 ms modulation, params smoothed over 20 ms.
 
-### Flanger (later — delay family)
-Reuse chorus delay line. Base delay **0.5–5 ms**; add **Feedback** (−0.95…+0.95) and
-**Manual** (base-delay) control. Through-zero flanging is an optional later refinement.
+### Flanger (Milestone 2)
+- `input --> modulated fractional delay line (with feedback) --> wet`; `output = dry*(1-mix) + wet*mix`.
+- Same `juce::dsp::DelayLine<float, Lagrange3rd>`, max delay ~15 ms.
+- Base delay 0.5–5 ms; the LFO sweeps the delay **upward** from base by up to +5 ms at full depth.
+- **Feedback** (−0.95…+0.95) closes the comb → the resonant "jet" sweep (the thing that makes it a
+  flanger and not a chorus). pop-before-push feedback loop.
+- Stereo: reuses the Chorus per-channel LFO phase offset; Width scales it.
+
+| Param | Range | Notes |
+|---|---|---|
+| Rate | 0.05–5 Hz | LFO speed (shared with Chorus) |
+| Depth | 0–100% | delay-sweep amount, up to +5 ms (shared) |
+| Mix | 0–100% | dry/wet (shared) |
+| Feedback | −95…95% | comb feedback, mapped to ±0.95 coefficient |
+| Base Delay | 0.5–5 ms | shortest delay / sweep floor (default 2 ms) |
+| Stereo Width | 0–100% | L/R LFO phase offset (shared) |
+
+**Shipped M2:** functionally correct and RT-safe — verified by offline impulse-response measurement
+(feedback lifts the resonant peak 0 → +14.6 dB at fb 0.9; base delay moves the comb by 1/D). Known
+**tuning caveats, not bugs:** (1) feedback default is 0, so out of the box it's a short-delay chorus
+until you raise it; (2) the feedback knob has a **linear taper** — audibly ~flat until ~75 % travel,
+with all the resonance crammed into the top quarter; (3) the sweep is **upward-only from base**, so
+with the 2 ms default base the comb never rises above ~500 Hz (no bright top-end "jet"). Candidate
+polish: skew the feedback range, lower the base-delay default toward ~1 ms, and/or give the Flanger
+its own Depth scaling instead of sharing Chorus's. See DEVLOG Session 6.
+
+Through-zero flanging is an optional later refinement.
 
 ### Phaser (later — all-pass family)
 Cascade of N **first-order all-pass filters** (`FirstOrderTPTFilter` in all-pass mode or

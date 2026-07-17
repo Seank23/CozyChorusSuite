@@ -20,6 +20,51 @@ belongs here.
 
 ---
 
+## 2026-07-17 — Session 6: Milestone 2 — Flanger (+ custom editor)
+
+**Done:**
+- Implemented the Flanger (`Source/dsp/FlangerEffect.{h,cpp}`): the delay-line skeleton reused as a
+  **feedback comb** — per sample `popSample` (modulated delay) **then**
+  `pushSample(input + feedback·wet)` (read-before-write, so min delay = 1 sample). Base delay
+  0.5–5 ms; LFO sweeps upward from base by up to +5 ms (unipolar `0.5 + 0.5·sin`); feedback ±0.95;
+  stereo width via the Chorus per-channel phase-offset trick. Rate/Depth/Mix/Width/Feedback/BaseDelay
+  all `SmoothedValue`.
+- Added `flangerFeedback` (−95…95 %, default 0) and `flangerBaseDelay` (0.5–5 ms, default 2) to the
+  APVTS (`Parameters.h`); wired `EffectType::Flanger → m_FlangerEffect` in `PluginProcessor` (caches
+  the two atomic pointers, builds `FlangerParameters` per block, feedback → ±0.95).
+- Replaced `GenericAudioProcessorEditor` with a hand-written `CCSAudioProcessorEditor`
+  (`Source/Editor/`): effect selector + rotary knobs; a 30 Hz `Timer` shows/hides per-effect controls
+  (Voices for Chorus; Feedback + Base Delay for Flanger). Implemented `resized()` (wrapping grid over
+  the *visible* controls) and `paint()` (background + title + a caption above each visible knob).
+  Compiles clean on MSVC v145.
+- **Verified the Flanger by measurement**, not just by ear: an offline C# reimplementation of the
+  exact loop + impulse-response DFT showed the DSP is correct — feedback raises the resonant peak
+  0 → +3.5 → +14.6 dB (fb 0 / 0.5 / 0.9), and base delay moves the comb 2000 / 500 / 200 Hz at
+  0.5 / 2 / 5 ms (the 1/D law).
+
+**Decisions:**
+- Flanger reuses Chorus's Rate/Depth/Mix/Width APVTS params (shared controls); only Feedback +
+  Base Delay are Flanger-specific. Phaser/Vibe still fall through to `NullEffect`.
+- GUI is no longer fully deferred: a functional, parameter-driven editor ships now. Custom
+  `LookAndFeel` / per-effect panels / LFO visualiser remain deferred.
+- Accepted the current Flanger tuning as "M2 complete" despite the caveats below — they are
+  parameter-curve / default choices, **not** correctness bugs.
+
+**Next up:**
+- Optional Flanger polish (skew the feedback taper, lower base-delay default to ~1 ms, decouple Depth
+  from Chorus) — user's call whether to fold into M2 or a later pass.
+- Milestone 3 (Phaser): new all-pass-cascade core (all-pass family), no delay buffer.
+
+**Open questions / blockers:**
+- Flanger **tuning caveats** (verified, not bugs): feedback default 0 → chorus-like out of the box;
+  linear feedback taper → knob feels dead until ~75 % travel; upward-only sweep from a 2 ms base → no
+  bright top-end. Decide whether to address before M3.
+- `CLAUDE.md`'s M1 "Voices not wired" note was stale (Session 5 wired it) — corrected this session.
+- Still no `pluginval` / automated DSP test in-repo; the C# harness was throwaway. Consider a Catch2
+  DSP test as the suite grows.
+
+---
+
 ## 2026-07-16 — Session 5: Chorus voices ensemble + stereo-width fix
 
 **Done:**

@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "Editor/CCSAudioProcessorEditor.h"
 
 namespace CozyChorus
 {
@@ -13,7 +14,9 @@ namespace CozyChorus
 		m_DepthParam = m_APVTS.getRawParameterValue(ParameterIDs::Depth);
 		m_MixParam = m_APVTS.getRawParameterValue(ParameterIDs::Mix);
 		m_WidthParam = m_APVTS.getRawParameterValue(ParameterIDs::Width);
-		m_VoicesParam = m_APVTS.getRawParameterValue(ParameterIDs::Voices);
+		m_ChorusVoicesParam = m_APVTS.getRawParameterValue(ParameterIDs::ChorusVoices);
+		m_FlangerFeedbackParam = m_APVTS.getRawParameterValue(ParameterIDs::FlangerFeedback);
+		m_FlangerBaseDelayParam = m_APVTS.getRawParameterValue(ParameterIDs::FlangerBaseDelay);
 	}
 
 	void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -25,12 +28,14 @@ namespace CozyChorus
 
 		m_NullEffect.Prepare(spec);
 		m_ChorusEffect.Prepare(spec);
+		m_FlangerEffect.Prepare(spec);
 	}
 
 	void PluginProcessor::releaseResources()
 	{
 		m_NullEffect.Reset();
 		m_ChorusEffect.Reset();
+		m_FlangerEffect.Reset();
 	}
 
 	bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -56,6 +61,7 @@ namespace CozyChorus
 		case EffectType::Chorus:
 			return m_ChorusEffect;
 		case EffectType::Flanger:
+			return m_FlangerEffect;
 		case EffectType::Phaser:
 		case EffectType::Vibe:
 		default:
@@ -74,20 +80,42 @@ namespace CozyChorus
 		juce::dsp::AudioBlock<float> block(buffer);
 		juce::dsp::ProcessContextReplacing<float> context(block);
 
-		ChorusParameters params{};
-		params.RateHz = m_RateParam->load();
-		params.Depth = std::clamp(m_DepthParam->load() / 100.0f, 0.0f, 1.0f);
-		params.Mix = std::clamp(m_MixParam->load() / 100.0f, 0.0f, 1.0f);
-		params.Width = std::clamp(m_WidthParam->load() / 100.0f, 0.0f, 1.0f);
-		params.Voices = static_cast<int>(m_VoicesParam->load());
-		m_ChorusEffect.SetParameters(params);
+		const auto type = static_cast<EffectType>(static_cast<int>(m_EffectTypeParam->load()));
+
+		switch (type)
+		{
+		case EffectType::Chorus:
+		{
+			ChorusParameters params{};
+			params.RateHz = m_RateParam->load();
+			params.Depth = std::clamp(m_DepthParam->load() / 100.0f, 0.0f, 1.0f);
+			params.Mix = std::clamp(m_MixParam->load() / 100.0f, 0.0f, 1.0f);
+			params.Width = std::clamp(m_WidthParam->load() / 100.0f, 0.0f, 1.0f);
+			params.Voices = static_cast<int>(m_ChorusVoicesParam->load());
+			m_ChorusEffect.SetParameters(params);
+			break;
+		}
+		case EffectType::Flanger:
+		{
+			FlangerParameters params{};
+			params.RateHz = m_RateParam->load();
+			params.Depth = std::clamp(m_DepthParam->load() / 100.0f, 0.0f, 1.0f);
+			params.Mix = std::clamp(m_MixParam->load() / 100.0f, 0.0f, 1.0f);
+			params.Width = std::clamp(m_WidthParam->load() / 100.0f, 0.0f, 1.0f);
+			params.Feedback = std::clamp(m_FlangerFeedbackParam->load() / 100.0f, -0.95f, 0.95f);
+			params.BaseDelayMs = m_FlangerBaseDelayParam->load();
+			m_FlangerEffect.SetParameters(params);
+			break;
+		}
+		}
+		
 
 		GetActiveEffect().Process(context);
 	}
 
 	juce::AudioProcessorEditor* PluginProcessor::createEditor()
 	{
-		return new juce::GenericAudioProcessorEditor(*this);
+		return new CCSAudioProcessorEditor(*this);
 	}
 
 	void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
