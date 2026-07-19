@@ -31,12 +31,15 @@ namespace CozyChorus
 
 		juce::Slider m_VoicesSlider;
 
-		juce::Slider m_FeedbackSlider, m_BaseDelaySlider;
+		juce::Slider m_FlangerFeedbackSlider, m_BaseDelaySlider;
+
+		juce::Slider m_StagesSlider, m_PhaserFeedbackSlider;
 
 		// Attachments — DECLARED AFTER the components so they destruct FIRST.
 		std::unique_ptr<ComboBoxAttachment> m_EffectAttachment;
 		std::unique_ptr<SliderAttachment> m_RateAtt, m_DepthAtt, m_MixAtt, m_WidthAtt;
-		std::unique_ptr<SliderAttachment> m_VoicesAtt, m_FeedbackAtt, m_BaseDelayAtt;
+		std::unique_ptr<SliderAttachment> m_VoicesAtt, m_FlangerFeedbackAtt, m_BaseDelayAtt;
+		std::unique_ptr<SliderAttachment> m_StagesAtt, m_PhaserFeedbackAtt;
 
 		int m_LastEffectIndex = -1;
 

@@ -20,6 +20,45 @@ belongs here.
 
 ---
 
+## 2026-07-20 — Session 7: Milestone 3 — Phaser (all-pass family)
+
+**Done:**
+- Implemented the Phaser (`Source/dsp/PhaserEffect.{h,cpp}`) — the first **all-pass family** effect and
+  the first with **no delay buffer**. Per channel: a cascade of N (2–12) hand-rolled **one-pole TPT
+  all-pass** stages (`g = tan(π·fc/fs)`, `G = g/(1+g)`; each stage returns `2·lowpass − input`, one
+  state var). The shared LFO modulates the all-pass cutoff `fc` in the **log domain** — centre/half-span
+  precomputed in `Prepare` from `MIN_FC_HZ=200`/`MAX_FC_HZ=2000`, then `fc = exp(logCenter +
+  logHalfSpan·depth·lfo)` clamped to range. **Feedback** wraps the whole cascade (`input +=
+  feedbackState·feedback` before, `feedbackState = cascadeOutput` after; ±0.95). Stereo width reuses the
+  per-channel LFO phase-offset trick. All state allocated in `Prepare`; Rate/Depth/Mix/Width/Feedback
+  all `SmoothedValue` (20 ms).
+- **Fixed a sweep-freezing bug:** `m_LFO.Advance()` was called once per *block* (outside the sample
+  loop) instead of once per *sample*, so the LFO crawled ~block-size too slowly and the filter sounded
+  static. Moved it inside the per-sample loop, matching `ChorusEffect`/`FlangerEffect`. Sweep now
+  audible across the range.
+- Added `phaserStages` (int 2–12, default 6) and `phaserFeedback` (−95…95 %, skew 0.4, default 0) to the
+  APVTS (`Parameters.h`); wired `EffectType::Phaser → m_PhaserEffect` in `PluginProcessor` (caches the
+  two atomic pointers, builds `PhaserParameters` per block, feedback → ±0.95).
+- Extended the editor: `Stages` + `Feedback` rotary sliders, shown only when Phaser is selected (30 Hz
+  `Timer` visibility, same mechanism as Chorus/Flanger). Only Vibe still falls through to `NullEffect`.
+- Updated `CLAUDE.md` (status → M3 done; milestones; architecture tree; Phaser topology decision;
+  Phaser DSP section + param table; reconciled the stale Flanger caveats against the shipped tuning).
+
+**Decisions:**
+- **Phaser = the shared all-pass skeleton** for Milestone 4 (Vibe): Vibe will reuse this cascade with
+  staggered per-stage coefficients + an asymmetric LFO, rather than a fresh core.
+- `Stages` is any int 2–12 (not restricted to even, despite the original brief note) — kept simple.
+
+**Next up:**
+- Build + audition M3 in the standalone host / DAW, then commit (one commit for the milestone).
+- Milestone 4 — Vibe (last effect): staggered all-pass stages, asymmetric LFO, Chorus/Vibrato mode.
+
+**Open questions / blockers:**
+- Phaser tuning is by-ear-pending: default `fc` range (200 Hz–2 kHz), stage count feel, and whether the
+  feedback taper/default want the same treatment the Flanger got. Defer to a polish pass.
+
+---
+
 ## 2026-07-17 — Session 6: Milestone 2 — Flanger (+ custom editor)
 
 **Done:**

@@ -17,6 +17,8 @@ namespace CozyChorus
 		inline constexpr auto ChorusVoices = "chorusVoices";
 		inline constexpr auto FlangerFeedback = "flangerFeedback";
 		inline constexpr auto FlangerBaseDelay = "flangerBaseDelay";
+		inline constexpr auto PhaserStages = "phaserStages";
+		inline constexpr auto PhaserFeedback = "phaserFeedback";
 	}
 
 	// Selectable effect. Values must match the effectType choice order below.
@@ -83,6 +85,17 @@ namespace CozyChorus
 			"Base Delay (ms)",
 			juce::NormalisableRange<float>(0.2f, 5.0f, 0.01f),
 			1.0f));
+
+		layout.add(std::make_unique<juce::AudioParameterInt>(
+			juce::ParameterID{ ParameterIDs::PhaserStages, 1 },
+			"Stages",
+			2, 12, 6));
+
+		layout.add(std::make_unique<juce::AudioParameterFloat>(
+			juce::ParameterID{ ParameterIDs::PhaserFeedback, 1 },
+			"Feedback",
+			juce::NormalisableRange<float>(-95.0f, 95.0f, 0.1f, 0.4f),
+			0.0f));
 
 		return layout;
 	}

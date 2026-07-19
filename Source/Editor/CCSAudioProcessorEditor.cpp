@@ -47,13 +47,21 @@ namespace CozyChorus
 		m_VoicesSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
 		m_VoicesSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
 
-		addAndMakeVisible(m_FeedbackSlider);
-		m_FeedbackSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_FeedbackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		addAndMakeVisible(m_FlangerFeedbackSlider);
+		m_FlangerFeedbackSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_FlangerFeedbackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
 
 		addAndMakeVisible(m_BaseDelaySlider);
 		m_BaseDelaySlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
 		m_BaseDelaySlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+
+		addAndMakeVisible(m_StagesSlider);
+		m_StagesSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_StagesSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+
+		addAndMakeVisible(m_PhaserFeedbackSlider);
+		m_PhaserFeedbackSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_PhaserFeedbackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
 
 		m_EffectAttachment = std::make_unique<ComboBoxAttachment>(m_APVTS, ParameterIDs::EffectType, m_EffectSelector);
 		m_RateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Rate, m_RateSlider);
@@ -61,8 +69,10 @@ namespace CozyChorus
 		m_DepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Depth, m_DepthSlider);
 		m_WidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Width, m_WidthSlider);
 		m_VoicesAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusVoices, m_VoicesSlider);
-		m_FeedbackAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerFeedback, m_FeedbackSlider);
+		m_FlangerFeedbackAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerFeedback, m_FlangerFeedbackSlider);
 		m_BaseDelayAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerBaseDelay, m_BaseDelaySlider);
+		m_StagesAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserStages, m_StagesSlider);
+		m_PhaserFeedbackAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserFeedback, m_PhaserFeedbackSlider);
 
 		startTimerHz(30);
 		UpdateVisibility();
@@ -92,13 +102,15 @@ namespace CozyChorus
 
 		const auto captionFor = [this](const juce::Component* slider) -> juce::String
 		{
-			if (slider == &m_RateSlider)      return "Rate";
-			if (slider == &m_DepthSlider)     return "Depth";
-			if (slider == &m_MixSlider)       return "Mix";
-			if (slider == &m_WidthSlider)     return "Width";
-			if (slider == &m_VoicesSlider)    return "Voices";
-			if (slider == &m_FeedbackSlider)  return "Feedback";
+			if (slider == &m_RateSlider) return "Rate";
+			if (slider == &m_DepthSlider) return "Depth";
+			if (slider == &m_MixSlider) return "Mix";
+			if (slider == &m_WidthSlider) return "Width";
+			if (slider == &m_VoicesSlider) return "Voices";
+			if (slider == &m_FlangerFeedbackSlider)  return "Feedback";
 			if (slider == &m_BaseDelaySlider) return "Base Delay";
+			if (slider == &m_StagesSlider) return "Stages";
+			if (slider == &m_PhaserFeedbackSlider) return "Feedback";
 			return {};
 		};
 
@@ -132,8 +144,10 @@ namespace CozyChorus
 	{
 		const auto type = static_cast<EffectType>(m_LastEffectIndex);
 		m_VoicesSlider.setVisible(type == EffectType::Chorus);
-		m_FeedbackSlider.setVisible(type == EffectType::Flanger);
+		m_FlangerFeedbackSlider.setVisible(type == EffectType::Flanger);
 		m_BaseDelaySlider.setVisible(type == EffectType::Flanger);
+		m_StagesSlider.setVisible(type == EffectType::Phaser);
+		m_PhaserFeedbackSlider.setVisible(type == EffectType::Phaser);
 		RenderComponents();
 	}
 
@@ -181,6 +195,6 @@ namespace CozyChorus
 
 	std::vector<juce::Component*> CCSAudioProcessorEditor::GetAllComponents()
 	{
-		return { &m_RateSlider, &m_DepthSlider, &m_MixSlider, &m_WidthSlider, &m_VoicesSlider, &m_FeedbackSlider, &m_BaseDelaySlider };
+		return { &m_RateSlider, &m_DepthSlider, &m_MixSlider, &m_WidthSlider, &m_VoicesSlider, &m_FlangerFeedbackSlider, &m_BaseDelaySlider, &m_StagesSlider, &m_PhaserFeedbackSlider };
 	}
 }

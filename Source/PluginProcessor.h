@@ -7,6 +7,7 @@
 #include "dsp/NullEffect.h"
 #include "dsp/ChorusEffect.h"
 #include "dsp/FlangerEffect.h"
+#include "dsp/PhaserEffect.h"
 
 #include <atomic>
 
@@ -58,6 +59,7 @@ namespace CozyChorus
 		NullEffect m_NullEffect;
 		ChorusEffect m_ChorusEffect;
 		FlangerEffect m_FlangerEffect;
+		PhaserEffect m_PhaserEffect;
 
 		// Cached atomic parameter pointer, read lock-free on the audio thread.
 		std::atomic<float>* m_EffectTypeParam = nullptr;
@@ -71,6 +73,9 @@ namespace CozyChorus
 
 		std::atomic<float>* m_FlangerFeedbackParam = nullptr;
 		std::atomic<float>* m_FlangerBaseDelayParam = nullptr;
+
+		std::atomic<float>* m_PhaserStagesParam = nullptr;
+		std::atomic<float>* m_PhaserFeedbackParam = nullptr;
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 	};

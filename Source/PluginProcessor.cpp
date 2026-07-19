@@ -17,6 +17,8 @@ namespace CozyChorus
 		m_ChorusVoicesParam = m_APVTS.getRawParameterValue(ParameterIDs::ChorusVoices);
 		m_FlangerFeedbackParam = m_APVTS.getRawParameterValue(ParameterIDs::FlangerFeedback);
 		m_FlangerBaseDelayParam = m_APVTS.getRawParameterValue(ParameterIDs::FlangerBaseDelay);
+		m_PhaserStagesParam = m_APVTS.getRawParameterValue(ParameterIDs::PhaserStages);
+		m_PhaserFeedbackParam = m_APVTS.getRawParameterValue(ParameterIDs::PhaserFeedback);
 	}
 
 	void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -29,6 +31,7 @@ namespace CozyChorus
 		m_NullEffect.Prepare(spec);
 		m_ChorusEffect.Prepare(spec);
 		m_FlangerEffect.Prepare(spec);
+		m_PhaserEffect.Prepare(spec);
 	}
 
 	void PluginProcessor::releaseResources()
@@ -36,6 +39,7 @@ namespace CozyChorus
 		m_NullEffect.Reset();
 		m_ChorusEffect.Reset();
 		m_FlangerEffect.Reset();
+		m_PhaserEffect.Reset();
 	}
 
 	bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -63,6 +67,7 @@ namespace CozyChorus
 		case EffectType::Flanger:
 			return m_FlangerEffect;
 		case EffectType::Phaser:
+			return m_PhaserEffect;
 		case EffectType::Vibe:
 		default:
 			return m_NullEffect;
@@ -105,6 +110,18 @@ namespace CozyChorus
 			params.Feedback = std::clamp(m_FlangerFeedbackParam->load() / 100.0f, -0.95f, 0.95f);
 			params.BaseDelayMs = m_FlangerBaseDelayParam->load();
 			m_FlangerEffect.SetParameters(params);
+			break;
+		}
+		case EffectType::Phaser:
+		{
+			PhaserParameters params{};
+			params.RateHz = m_RateParam->load();
+			params.Depth = std::clamp(m_DepthParam->load() / 100.0f, 0.0f, 1.0f);
+			params.Mix = std::clamp(m_MixParam->load() / 100.0f, 0.0f, 1.0f);
+			params.Width = std::clamp(m_WidthParam->load() / 100.0f, 0.0f, 1.0f);
+			params.Feedback = std::clamp(m_PhaserFeedbackParam->load() / 100.0f, -0.95f, 0.95f);
+			params.Stages = static_cast<int>(m_PhaserStagesParam->load());
+			m_PhaserEffect.SetParameters(params);
 			break;
 		}
 		}

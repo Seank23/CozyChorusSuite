@@ -9,8 +9,8 @@ works in mono and stereo. C++20 / JUCE 8 / CMake.
 
 ## Current status
 
-- **Phase:** Milestone 2 complete — Chorus + Flanger are implemented and audible (both delay-line
-  family). Milestone 3 (Phaser, all-pass family) is next.
+- **Phase:** Milestone 3 complete — Chorus + Flanger (delay-line family) **and Phaser** (all-pass
+  family) are implemented and audible. Milestone 4 (Vibe, all-pass family) is next — the last effect.
 - A hand-written **`CCSAudioProcessorEditor`** (rotary knobs + effect selector, per-effect control
   visibility) has replaced the generic editor. Custom `LookAndFeel` / LFO visualiser still deferred.
 - Builds as **VST3 + Standalone** via CMake + JUCE **8.0.14** with the `Visual Studio 18 2026`
@@ -91,7 +91,11 @@ Fixed order (delay-line family first, then all-pass family):
    Rate/Depth/Mix/Width/Feedback/BaseDelay, all smoothed). A custom `CCSAudioProcessorEditor`
    (`Source/Editor/`) landed alongside — effect selector + rotary knobs, per-effect control
    visibility. See the Flanger notes below for shipped tuning caveats.
-4. **Milestone 3 — Phaser.** All-pass cascade (new core).
+4. **Milestone 3 — Phaser. ✅ Done.** All-pass cascade (new core, first non-delay-line effect):
+   `PhaserEffect` — a cascade of N (2–12) hand-rolled one-pole **TPT all-pass** stages; the shared LFO
+   modulates the all-pass cutoff, log-spaced **200 Hz–2 kHz**; **feedback** (±0.95) wraps the whole
+   cascade for resonance. Rate/Depth/Mix/Width are the shared controls; **Stages + Feedback** are
+   Phaser-only. All params smoothed. No delay buffer.
 5. **Milestone 4 — Vibe.** Phaser variant, staggered stages + asymmetric LFO (hardest, last).
 6. **GUI — in progress (functional).** A parameter-driven `CCSAudioProcessorEditor` now ships
    (rotary knobs, effect selector, per-effect control visibility). Still deferred: custom
@@ -155,11 +159,12 @@ Source/
     CCSAudioProcessorEditor.h / .cpp  // custom editor: effect selector + rotary knobs, per-effect control visibility (30 Hz Timer), wrapping-grid layout; createEditor() returns this
   dsp/
     ModulationEffect.h       // abstract base: Prepare(spec) / Process(context) / Reset()
-    NullEffect.h             // pass-through; still the fallback for effects not yet built (Phaser/Vibe)
-    LFO.h / .cpp             // shared LFO: continuous phase, per-channel phase-offset reads, Hz rate; sine/triangle/saw/square implemented (Chorus + Flanger use sine)
+    NullEffect.h             // pass-through; still the fallback for the one effect not yet built (Vibe)
+    LFO.h / .cpp             // shared LFO: continuous phase, per-channel phase-offset reads, Hz rate; sine/triangle/saw/square implemented (Chorus + Flanger + Phaser use sine)
     ChorusEffect.h / .cpp    // Chorus (delay-line family) — Milestone 1, done
     FlangerEffect.h / .cpp   // Flanger (delay-line family, feedback comb) — Milestone 2, done
-    // PhaserEffect, VibeEffect added in later milestones
+    PhaserEffect.h / .cpp    // Phaser (all-pass family, TPT all-pass cascade + feedback) — Milestone 3, done
+    // VibeEffect added in Milestone 4
 ```
 
 ### Design principle: two DSP families, one shared skeleton
@@ -191,7 +196,7 @@ All four are driven by a shared **LFO** and share **Rate / Depth / Mix / Stereo*
 - **Sources are globbed:** `CMakeLists.txt` uses `file(GLOB_RECURSE … CONFIGURE_DEPENDS)` over
   `Source/*.cpp|*.h`, so new files are collected on the next build with no CMake edit.
 - **`PluginProcessor`** owns the APVTS and one instance of each effect; an `effectType`
-  choice parameter selects which effect `processBlock` dispatches to (Phaser/Vibe → `NullEffect`
+  choice parameter selects which effect `processBlock` dispatches to (Vibe → `NullEffect`
   until built).
 - **Flanger topology (M2):** the delay-line skeleton reused as a **feedback comb** — per sample
   `popSample` (read the modulated delay) **then** `pushSample(input + feedback·wet)`, i.e. read
@@ -200,12 +205,21 @@ All four are driven by a shared **LFO** and share **Rate / Depth / Mix / Stereo*
   unipolar); feedback ±0.95; stereo width reuses the Chorus per-channel phase-offset trick.
   Rate/Depth/Mix/Width are the **same APVTS params** as Chorus (shared controls); Feedback + Base
   Delay are Flanger-only.
-- **Editor (M2):** replaced `GenericAudioProcessorEditor` with a hand-written
+- **Editor (M2, extended M3):** replaced `GenericAudioProcessorEditor` with a hand-written
   `CCSAudioProcessorEditor` (`Source/Editor/`). One shared set of rotary sliders + an effect
   selector; a 30 Hz `Timer` watches the `effectType` param and shows/hides the per-effect controls
-  (Voices for Chorus; Feedback + Base Delay for Flanger). `resized()` lays the *visible* controls out
-  in a wrapping grid; `paint()` fills the background and draws the title + a caption above each
-  visible knob. No custom `LookAndFeel` yet — a later polish pass.
+  (Voices for Chorus; Feedback + Base Delay for Flanger; **Stages + Feedback for Phaser**). `resized()`
+  lays the *visible* controls out in a wrapping grid; `paint()` fills the background and draws the
+  title + a caption above each visible knob. No custom `LookAndFeel` yet — a later polish pass.
+- **Phaser topology (M3):** the all-pass family's shared skeleton — a per-channel cascade of N
+  hand-rolled **one-pole TPT all-pass** stages (`g = tan(π·fc/fs)`, `G = g/(1+g)`; each stage returns
+  `2·lowpass − input` and carries one state variable). The shared LFO modulates the cutoff `fc` in the
+  **log domain** (centre/half-span precomputed in `Prepare` from `MIN_FC_HZ=200`/`MAX_FC_HZ=2000`), so
+  `fc = exp(logCenter + logHalfSpan·depth·lfo)`, clamped to the range. **Feedback** wraps the whole
+  cascade: `input += feedbackState·feedback` before the stages, `feedbackState = cascadeOutput` after
+  (±0.95). Stereo width reuses the Chorus/Flanger per-channel LFO phase-offset trick. Rate/Depth/Mix/
+  Width are the shared APVTS params; **Stages** (2–12, default 6) and **Feedback** (default 0) are
+  Phaser-only. No delay line — this is the first effect that allocates no delay buffer.
 
 ---
 
@@ -265,25 +279,45 @@ delay 20 ms, ±7 ms modulation, params smoothed over 20 ms.
 | Rate | 0.05–5 Hz | LFO speed (shared with Chorus) |
 | Depth | 0–100% | delay-sweep amount, up to +5 ms (shared) |
 | Mix | 0–100% | dry/wet (shared) |
-| Feedback | −95…95% | comb feedback, mapped to ±0.95 coefficient |
-| Base Delay | 0.5–5 ms | shortest delay / sweep floor (default 2 ms) |
+| Feedback | −95…95% | comb feedback, mapped to ±0.95 coefficient (skew 0.4, default 45%) |
+| Base Delay | 0.2–5 ms | shortest delay / sweep floor (default 1 ms) |
 | Stereo Width | 0–100% | L/R LFO phase offset (shared) |
 
-**Shipped M2:** functionally correct and RT-safe — verified by offline impulse-response measurement
-(feedback lifts the resonant peak 0 → +14.6 dB at fb 0.9; base delay moves the comb by 1/D). Known
-**tuning caveats, not bugs:** (1) feedback default is 0, so out of the box it's a short-delay chorus
-until you raise it; (2) the feedback knob has a **linear taper** — audibly ~flat until ~75 % travel,
-with all the resonance crammed into the top quarter; (3) the sweep is **upward-only from base**, so
-with the 2 ms default base the comb never rises above ~500 Hz (no bright top-end "jet"). Candidate
-polish: skew the feedback range, lower the base-delay default toward ~1 ms, and/or give the Flanger
-its own Depth scaling instead of sharing Chorus's. See DEVLOG Session 6.
+**Shipped M2 (+ tuning):** functionally correct and RT-safe — verified by offline impulse-response
+measurement (feedback lifts the resonant peak 0 → +14.6 dB at fb 0.9; base delay moves the comb by
+1/D). Two of the three M2 tuning caveats were then addressed in the shipped params: feedback now
+**defaults to 45%** (audible resonance out of the box) with a **skewed taper** (`skew 0.4`, so the
+knob's travel is no longer bunched into the top quarter), and the **base delay default dropped to
+1 ms** (range widened to 0.2–5 ms). Remaining caveat, not a bug: the sweep is still **upward-only from
+base**, so the comb's top-end reach is limited and there's no separate Flanger Depth scaling (it shares
+Chorus's). See DEVLOG Session 6.
 
 Through-zero flanging is an optional later refinement.
 
-### Phaser (later — all-pass family)
-Cascade of N **first-order all-pass filters** (`FirstOrderTPTFilter` in all-pass mode or
-hand-rolled one-pole all-pass). LFO modulates all-pass cutoff (~200 Hz–2 kHz). Controls:
-**Stages** (2–12, even), **Feedback**, **Rate**, **Depth**, **Mix**. No delay buffer.
+### Phaser (Milestone 3 — all-pass family)
+- `input --> feedback --> N-stage all-pass cascade --> wet`; `output = dry*(1-mix) + wet*mix`.
+- Cascade of N **first-order all-pass filters**, hand-rolled in **TPT** form (`g = tan(π·fc/fs)`,
+  `G = g/(1+g)`; each stage outputs `2·lowpass − input`, one state var per stage).
+- LFO modulates the all-pass cutoff `fc` in the **log domain**, swept over **200 Hz–2 kHz**; Depth
+  scales the sweep, Rate sets LFO speed.
+- **Feedback** (−0.95…+0.95) wraps the whole cascade → resonant peaks between the notches.
+- Stereo: reuses the per-channel LFO phase offset; Width scales it.
+- **No delay buffer** — the first effect that allocates none.
+
+| Param | Range | Notes |
+|---|---|---|
+| Rate | 0.05–5 Hz | LFO speed (shared) |
+| Depth | 0–100% | cutoff-sweep amount (shared) |
+| Mix | 0–100% | dry/wet (shared) |
+| Stages | 2–12 | number of all-pass stages (default 6) |
+| Feedback | −95…95% | cascade feedback, mapped to ±0.95 coefficient (default 0) |
+| Stereo Width | 0–100% | L/R LFO phase offset (shared) |
+
+**Shipped M3:** functionally correct and RT-safe — all state (`m_AllPassState`, `m_FeedbackState`)
+allocated in `Prepare`, params smoothed over 20 ms, LFO phase advanced **once per sample** (a
+block-rate `Advance()` bug that froze the sweep was caught and fixed before sign-off). `Stages` is any
+int 2–12 (not restricted to even). Sweep audibly present across the range; feedback lifts the resonant
+peaks. Tuning by ear against reference phaser material still open for a later polish pass.
 
 ### Vibe (last — all-pass family, hardest)
 Phaser variant: **4 all-pass stages with staggered coefficients**, an **asymmetric LFO**
