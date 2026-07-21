@@ -27,6 +27,8 @@ namespace CozyChorus
 		for (auto& channelState : m_AllPassState)
 			channelState.fill(0.0f);
 		m_FeedbackState.fill(0.0f);
+
+		SetParameters(PhaserParameters{});
 	}
 
 	void PhaserEffect::Process(const juce::dsp::ProcessContextReplacing<float>& context)

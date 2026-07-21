@@ -65,20 +65,28 @@ namespace CozyChorus
 
 		// Cached atomic parameter pointer, read lock-free on the audio thread.
 		std::atomic<float>* m_EffectTypeParam = nullptr;
-
-		std::atomic<float>* m_RateParam = nullptr;
-		std::atomic<float>* m_DepthParam = nullptr;
 		std::atomic<float>* m_MixParam = nullptr;
-		std::atomic<float>* m_WidthParam = nullptr;
 
+		std::atomic<float>* m_ChorusRateParam = nullptr;
+		std::atomic<float>* m_ChorusDepthParam = nullptr;
+		std::atomic<float>* m_ChorusWidthParam = nullptr;
 		std::atomic<float>* m_ChorusVoicesParam = nullptr;
 
+		std::atomic<float>* m_FlangerRateParam = nullptr;
+		std::atomic<float>* m_FlangerDepthParam = nullptr;
+		std::atomic<float>* m_FlangerWidthParam = nullptr;
 		std::atomic<float>* m_FlangerFeedbackParam = nullptr;
 		std::atomic<float>* m_FlangerBaseDelayParam = nullptr;
 
+		std::atomic<float>* m_PhaserRateParam = nullptr;
+		std::atomic<float>* m_PhaserDepthParam = nullptr;
+		std::atomic<float>* m_PhaserWidthParam = nullptr;
 		std::atomic<float>* m_PhaserStagesParam = nullptr;
 		std::atomic<float>* m_PhaserFeedbackParam = nullptr;
 
+		std::atomic<float>* m_VibeRateParam = nullptr;
+		std::atomic<float>* m_VibeDepthParam = nullptr;
+		std::atomic<float>* m_VibeWidthParam = nullptr;
 		std::atomic<float>* m_VibeModeParam = nullptr;
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)

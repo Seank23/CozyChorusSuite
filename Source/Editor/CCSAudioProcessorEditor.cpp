@@ -25,57 +25,91 @@ namespace CozyChorus
 		: juce::AudioProcessorEditor(processor), m_Processor(static_cast<PluginProcessor&>(processor)), m_APVTS(m_Processor.GetAPVTS())
 	{
 		addAndMakeVisible(m_EffectSelector);
-		m_EffectSelector.addItemList(GetEffectTypeChoices(), 1); 
-
-		addAndMakeVisible(m_RateSlider);
-		m_RateSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_RateSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-
+		m_EffectSelector.addItemList(GetEffectTypeChoices(), 1);
 		addAndMakeVisible(m_MixSlider);
 		m_MixSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
 		m_MixSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
 
-		addAndMakeVisible(m_DepthSlider);
-		m_DepthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_DepthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		addAndMakeVisible(m_ChorusRateSlider);
+		m_ChorusRateSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_ChorusRateSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		addAndMakeVisible(m_ChorusDepthSlider);
+		m_ChorusDepthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_ChorusDepthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		addAndMakeVisible(m_ChorusWidthSlider);
+		m_ChorusWidthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_ChorusWidthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		addAndMakeVisible(m_ChorusVoicesSlider);
+		m_ChorusVoicesSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_ChorusVoicesSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
 
-		addAndMakeVisible(m_WidthSlider);
-		m_WidthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_WidthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-
-		addAndMakeVisible(m_VoicesSlider);
-		m_VoicesSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_VoicesSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-
+		addAndMakeVisible(m_FlangerRateSlider);
+		m_FlangerRateSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_FlangerRateSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		addAndMakeVisible(m_FlangerDepthSlider);
+		m_FlangerDepthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_FlangerDepthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		addAndMakeVisible(m_FlangerWidthSlider);
+		m_FlangerWidthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_FlangerWidthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
 		addAndMakeVisible(m_FlangerFeedbackSlider);
 		m_FlangerFeedbackSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
 		m_FlangerFeedbackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		addAndMakeVisible(m_FlangerBaseDelaySlider);
+		m_FlangerBaseDelaySlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_FlangerBaseDelaySlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
 
-		addAndMakeVisible(m_BaseDelaySlider);
-		m_BaseDelaySlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_BaseDelaySlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-
-		addAndMakeVisible(m_StagesSlider);
-		m_StagesSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_StagesSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-
+		addAndMakeVisible(m_PhaserRateSlider);
+		m_PhaserRateSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_PhaserRateSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		addAndMakeVisible(m_PhaserDepthSlider);
+		m_PhaserDepthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_PhaserDepthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		addAndMakeVisible(m_PhaserWidthSlider);
+		m_PhaserWidthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_PhaserWidthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		addAndMakeVisible(m_PhaserStagesSlider);
+		m_PhaserStagesSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_PhaserStagesSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
 		addAndMakeVisible(m_PhaserFeedbackSlider);
 		m_PhaserFeedbackSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
 		m_PhaserFeedbackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
 
+		addAndMakeVisible(m_VibeRateSlider);
+		m_VibeRateSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_VibeRateSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		addAndMakeVisible(m_VibeDepthSlider);
+		m_VibeDepthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_VibeDepthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		addAndMakeVisible(m_VibeWidthSlider);
+		m_VibeWidthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_VibeWidthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
 		addAndMakeVisible(m_VibeModeButton);
 		m_VibeModeButton.setButtonText("Vibrato");
 
 		m_EffectAttachment = std::make_unique<ComboBoxAttachment>(m_APVTS, ParameterIDs::EffectType, m_EffectSelector);
-		m_RateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Rate, m_RateSlider);
 		m_MixAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Mix, m_MixSlider);
-		m_DepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Depth, m_DepthSlider);
-		m_WidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Width, m_WidthSlider);
-		m_VoicesAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusVoices, m_VoicesSlider);
+
+		m_ChorusRateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusRate, m_ChorusRateSlider);
+		m_ChorusDepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusDepth, m_ChorusDepthSlider);
+		m_ChorusWidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusWidth, m_ChorusWidthSlider);
+		m_ChorusVoicesAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusVoices, m_ChorusVoicesSlider);
+
+		m_FlangerRateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerRate, m_FlangerRateSlider);
+		m_FlangerDepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerDepth, m_FlangerDepthSlider);
+		m_FlangerWidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerWidth, m_FlangerWidthSlider);
 		m_FlangerFeedbackAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerFeedback, m_FlangerFeedbackSlider);
-		m_BaseDelayAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerBaseDelay, m_BaseDelaySlider);
-		m_StagesAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserStages, m_StagesSlider);
+		m_FlangerBaseDelayAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerBaseDelay, m_FlangerBaseDelaySlider);
+
+		m_PhaserRateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserRate, m_PhaserRateSlider);
+		m_PhaserDepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserDepth, m_PhaserDepthSlider);
+		m_PhaserWidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserWidth, m_PhaserWidthSlider);
+		m_PhaserStagesAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserStages, m_PhaserStagesSlider);
 		m_PhaserFeedbackAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserFeedback, m_PhaserFeedbackSlider);
+
+		m_VibeRateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::VibeRate, m_VibeRateSlider);
+		m_VibeDepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::VibeDepth, m_VibeDepthSlider);
+		m_VibeWidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::VibeWidth, m_VibeWidthSlider);
 		m_VibeModeAtt = std::make_unique<ButtonAttachment>(m_APVTS, ParameterIDs::VibeMode, m_VibeModeButton);
 
 		startTimerHz(30);
@@ -106,15 +140,28 @@ namespace CozyChorus
 
 		const auto captionFor = [this](const juce::Component* comp) -> juce::String
 		{
-			if (comp == &m_RateSlider) return "Rate";
-			if (comp == &m_DepthSlider) return "Depth";
 			if (comp == &m_MixSlider) return "Mix";
-			if (comp == &m_WidthSlider) return "Width";
-			if (comp == &m_VoicesSlider) return "Voices";
+
+			if (comp == &m_ChorusRateSlider) return "Rate";
+			if (comp == &m_ChorusDepthSlider) return "Depth";
+			if (comp == &m_ChorusWidthSlider) return "Width";
+			if (comp == &m_ChorusVoicesSlider) return "Voices";
+
+			if (comp == &m_FlangerRateSlider) return "Rate";
+			if (comp == &m_FlangerDepthSlider) return "Depth";
+			if (comp == &m_FlangerWidthSlider) return "Width";
 			if (comp == &m_FlangerFeedbackSlider)  return "Feedback";
-			if (comp == &m_BaseDelaySlider) return "Base Delay";
-			if (comp == &m_StagesSlider) return "Stages";
+			if (comp == &m_FlangerBaseDelaySlider) return "Base Delay";
+
+			if (comp == &m_PhaserRateSlider) return "Rate";
+			if (comp == &m_PhaserDepthSlider) return "Depth";
+			if (comp == &m_PhaserWidthSlider) return "Width";
+			if (comp == &m_PhaserStagesSlider) return "Stages";
 			if (comp == &m_PhaserFeedbackSlider) return "Feedback";
+
+			if (comp == &m_VibeRateSlider) return "Rate";
+			if (comp == &m_VibeDepthSlider) return "Depth";
+			if (comp == &m_VibeWidthSlider) return "Width";
 			if (comp == &m_VibeModeButton) return "Vibrato";
 			return {};
 		};
@@ -148,12 +195,31 @@ namespace CozyChorus
 	void CCSAudioProcessorEditor::UpdateVisibility()
 	{
 		const auto type = static_cast<EffectType>(m_LastEffectIndex);
-		m_VoicesSlider.setVisible(type == EffectType::Chorus);
+
+		m_MixSlider.setVisible(true);
+
+		m_ChorusRateSlider.setVisible(type == EffectType::Chorus);
+		m_ChorusDepthSlider.setVisible(type == EffectType::Chorus);
+		m_ChorusWidthSlider.setVisible(type == EffectType::Chorus);
+		m_ChorusVoicesSlider.setVisible(type == EffectType::Chorus);
+
+		m_FlangerRateSlider.setVisible(type == EffectType::Flanger);
+		m_FlangerDepthSlider.setVisible(type == EffectType::Flanger);
+		m_FlangerWidthSlider.setVisible(type == EffectType::Flanger);
 		m_FlangerFeedbackSlider.setVisible(type == EffectType::Flanger);
-		m_BaseDelaySlider.setVisible(type == EffectType::Flanger);
-		m_StagesSlider.setVisible(type == EffectType::Phaser);
+		m_FlangerBaseDelaySlider.setVisible(type == EffectType::Flanger);
+
+		m_PhaserRateSlider.setVisible(type == EffectType::Phaser);
+		m_PhaserDepthSlider.setVisible(type == EffectType::Phaser);
+		m_PhaserWidthSlider.setVisible(type == EffectType::Phaser);
+		m_PhaserStagesSlider.setVisible(type == EffectType::Phaser);
 		m_PhaserFeedbackSlider.setVisible(type == EffectType::Phaser);
+
+		m_VibeRateSlider.setVisible(type == EffectType::Vibe);
+		m_VibeDepthSlider.setVisible(type == EffectType::Vibe);
+		m_VibeWidthSlider.setVisible(type == EffectType::Vibe);
 		m_VibeModeButton.setVisible(type == EffectType::Vibe);
+
 		RenderComponents();
 	}
 
@@ -201,6 +267,6 @@ namespace CozyChorus
 
 	std::vector<juce::Component*> CCSAudioProcessorEditor::GetAllComponents()
 	{
-		return { &m_RateSlider, &m_DepthSlider, &m_MixSlider, &m_WidthSlider, &m_VoicesSlider, &m_FlangerFeedbackSlider, &m_BaseDelaySlider, &m_StagesSlider, &m_PhaserFeedbackSlider, &m_VibeModeButton };
+		return { &m_MixSlider, &m_ChorusRateSlider, &m_ChorusDepthSlider, &m_ChorusWidthSlider, &m_ChorusVoicesSlider, &m_FlangerRateSlider, &m_FlangerDepthSlider, &m_FlangerWidthSlider, &m_FlangerFeedbackSlider, &m_FlangerBaseDelaySlider, &m_PhaserRateSlider, &m_PhaserDepthSlider, &m_PhaserWidthSlider, &m_PhaserStagesSlider, &m_PhaserFeedbackSlider, &m_VibeRateSlider, &m_VibeDepthSlider, &m_VibeWidthSlider, &m_VibeModeButton };
 	}
 }

@@ -22,6 +22,8 @@ namespace CozyChorus
 
 		for (auto* smoothedVal : { &m_RateHz, &m_Depth, &m_Mix, &m_Width, &m_Voices })
 			smoothedVal->reset(spec.sampleRate, 0.02);
+
+		SetParameters(ChorusParameters{});
 	}
 
 	void ChorusEffect::Process(const juce::dsp::ProcessContextReplacing<float>& context)

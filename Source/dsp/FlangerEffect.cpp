@@ -22,6 +22,8 @@ namespace CozyChorus
 
 		for (auto* smoothedVal : { &m_RateHz, &m_Depth, &m_Mix, &m_Width, &m_Feedback, &m_BaseDelayMs })
 			smoothedVal->reset(spec.sampleRate, 0.02);
+
+		SetParameters(FlangerParameters{});
 	}
 
 	void FlangerEffect::Process(const juce::dsp::ProcessContextReplacing<float>& context)

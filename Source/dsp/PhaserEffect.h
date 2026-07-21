@@ -1,16 +1,15 @@
 #pragma once
 #include "ModulationEffect.h"
-#include "LFO.h"
 
 namespace CozyChorus
 {
 	struct PhaserParameters
 	{
-		float RateHz = 0.5f;
-		float Depth = 0.5f;
+		float RateHz = 0.8f;
+		float Depth = 0.8f;
 		float Mix = 0.5f;
 		float Width = 0.5f;
-		float Feedback = 0.0f;
+		float Feedback = 0.3f;
 		int Stages = 6;
 	};
 
@@ -27,11 +26,8 @@ namespace CozyChorus
 		void SetParameters(const PhaserParameters& params);
 
 	private:
-		LFO m_LFO;
-
 		juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> m_RateHz, m_Depth, m_Mix, m_Width, m_Feedback;
 		int m_Stages = 6;
-		double m_SampleRate = 44100.0;
 
 		float m_LogCenter = 0.0f;
 		float m_LogHalfSpan = 0.0f;

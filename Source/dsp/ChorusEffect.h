@@ -1,16 +1,15 @@
 #pragma once
 #include "ModulationEffect.h"
-#include "LFO.h"
 
 namespace CozyChorus
 {
 	struct ChorusParameters
 	{
-		float RateHz = 0.8f;
-		float Depth = 0.5f;
+		float RateHz = 0.6f;
+		float Depth = 0.7f;
 		float Mix = 0.5f;
-		float Width = 0.5f;
-		int Voices = 1;
+		float Width = 0.75f;
+		int Voices = 3;
 	};
 
 	class ChorusEffect : public ModulationEffect
@@ -27,11 +26,9 @@ namespace CozyChorus
 
 	private:
 		juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> m_DelayLine;
-		LFO m_LFO;
 
 		juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> m_RateHz, m_Depth, m_Mix, m_Width, m_Voices;
 
-		double m_SampleRate = 44100.0;
 		float m_BaseDelayMs = 20.0f;
 		int m_MaxDelaySamples = 0;
 

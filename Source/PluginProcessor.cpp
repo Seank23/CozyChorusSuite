@@ -10,15 +10,28 @@ namespace CozyChorus
 		  m_APVTS(*this, nullptr, "PARAMETERS", CreateParameterLayout())
 	{
 		m_EffectTypeParam = m_APVTS.getRawParameterValue(ParameterIDs::EffectType);
-		m_RateParam = m_APVTS.getRawParameterValue(ParameterIDs::Rate);
-		m_DepthParam = m_APVTS.getRawParameterValue(ParameterIDs::Depth);
 		m_MixParam = m_APVTS.getRawParameterValue(ParameterIDs::Mix);
-		m_WidthParam = m_APVTS.getRawParameterValue(ParameterIDs::Width);
+
+		m_ChorusRateParam = m_APVTS.getRawParameterValue(ParameterIDs::ChorusRate);
+		m_ChorusDepthParam = m_APVTS.getRawParameterValue(ParameterIDs::ChorusDepth);
+		m_ChorusWidthParam = m_APVTS.getRawParameterValue(ParameterIDs::ChorusWidth);
 		m_ChorusVoicesParam = m_APVTS.getRawParameterValue(ParameterIDs::ChorusVoices);
+
+		m_FlangerRateParam = m_APVTS.getRawParameterValue(ParameterIDs::FlangerRate);
+		m_FlangerDepthParam = m_APVTS.getRawParameterValue(ParameterIDs::FlangerDepth);
+		m_FlangerWidthParam = m_APVTS.getRawParameterValue(ParameterIDs::FlangerWidth);
 		m_FlangerFeedbackParam = m_APVTS.getRawParameterValue(ParameterIDs::FlangerFeedback);
 		m_FlangerBaseDelayParam = m_APVTS.getRawParameterValue(ParameterIDs::FlangerBaseDelay);
+
+		m_PhaserRateParam = m_APVTS.getRawParameterValue(ParameterIDs::PhaserRate);
+		m_PhaserDepthParam = m_APVTS.getRawParameterValue(ParameterIDs::PhaserDepth);
+		m_PhaserWidthParam = m_APVTS.getRawParameterValue(ParameterIDs::PhaserWidth);
 		m_PhaserStagesParam = m_APVTS.getRawParameterValue(ParameterIDs::PhaserStages);
 		m_PhaserFeedbackParam = m_APVTS.getRawParameterValue(ParameterIDs::PhaserFeedback);
+
+		m_VibeRateParam = m_APVTS.getRawParameterValue(ParameterIDs::VibeRate);
+		m_VibeDepthParam = m_APVTS.getRawParameterValue(ParameterIDs::VibeDepth);
+		m_VibeWidthParam = m_APVTS.getRawParameterValue(ParameterIDs::VibeWidth);
 		m_VibeModeParam = m_APVTS.getRawParameterValue(ParameterIDs::VibeMode);
 	}
 
@@ -96,10 +109,10 @@ namespace CozyChorus
 		case EffectType::Chorus:
 		{
 			ChorusParameters params{};
-			params.RateHz = m_RateParam->load();
-			params.Depth = std::clamp(m_DepthParam->load() / 100.0f, 0.0f, 1.0f);
+			params.RateHz = m_ChorusRateParam->load();
+			params.Depth = std::clamp(m_ChorusDepthParam->load() / 100.0f, 0.0f, 1.0f);
 			params.Mix = std::clamp(m_MixParam->load() / 100.0f, 0.0f, 1.0f);
-			params.Width = std::clamp(m_WidthParam->load() / 100.0f, 0.0f, 1.0f);
+			params.Width = std::clamp(m_ChorusWidthParam->load() / 100.0f, 0.0f, 1.0f);
 			params.Voices = static_cast<int>(m_ChorusVoicesParam->load());
 			m_ChorusEffect.SetParameters(params);
 			break;
@@ -107,10 +120,10 @@ namespace CozyChorus
 		case EffectType::Flanger:
 		{
 			FlangerParameters params{};
-			params.RateHz = m_RateParam->load();
-			params.Depth = std::clamp(m_DepthParam->load() / 100.0f, 0.0f, 1.0f);
+			params.RateHz = m_FlangerRateParam->load();
+			params.Depth = std::clamp(m_FlangerDepthParam->load() / 100.0f, 0.0f, 1.0f);
 			params.Mix = std::clamp(m_MixParam->load() / 100.0f, 0.0f, 1.0f);
-			params.Width = std::clamp(m_WidthParam->load() / 100.0f, 0.0f, 1.0f);
+			params.Width = std::clamp(m_FlangerWidthParam->load() / 100.0f, 0.0f, 1.0f);
 			params.Feedback = std::clamp(m_FlangerFeedbackParam->load() / 100.0f, -0.95f, 0.95f);
 			params.BaseDelayMs = m_FlangerBaseDelayParam->load();
 			m_FlangerEffect.SetParameters(params);
@@ -119,10 +132,10 @@ namespace CozyChorus
 		case EffectType::Phaser:
 		{
 			PhaserParameters params{};
-			params.RateHz = m_RateParam->load();
-			params.Depth = std::clamp(m_DepthParam->load() / 100.0f, 0.0f, 1.0f);
+			params.RateHz = m_PhaserRateParam->load();
+			params.Depth = std::clamp(m_PhaserDepthParam->load() / 100.0f, 0.0f, 1.0f);
 			params.Mix = std::clamp(m_MixParam->load() / 100.0f, 0.0f, 1.0f);
-			params.Width = std::clamp(m_WidthParam->load() / 100.0f, 0.0f, 1.0f);
+			params.Width = std::clamp(m_PhaserWidthParam->load() / 100.0f, 0.0f, 1.0f);
 			params.Feedback = std::clamp(m_PhaserFeedbackParam->load() / 100.0f, -0.95f, 0.95f);
 			params.Stages = static_cast<int>(m_PhaserStagesParam->load());
 			m_PhaserEffect.SetParameters(params);
@@ -131,10 +144,10 @@ namespace CozyChorus
 		case EffectType::Vibe:
 		{
 			VibeParameters params{};
-			params.RateHz = m_RateParam->load();
-			params.Depth = std::clamp(m_DepthParam->load() / 100.0f, 0.0f, 1.0f);
+			params.RateHz = m_VibeRateParam->load();
+			params.Depth = std::clamp(m_VibeDepthParam->load() / 100.0f, 0.0f, 1.0f);
 			params.Mix = std::clamp(m_MixParam->load() / 100.0f, 0.0f, 1.0f);
-			params.Width = std::clamp(m_WidthParam->load() / 100.0f, 0.0f, 1.0f);
+			params.Width = std::clamp(m_VibeWidthParam->load() / 100.0f, 0.0f, 1.0f);
 			params.Vibrato = (m_VibeModeParam->load() > 0.5f);
 			m_VibeEffect.SetParameters(params);
 			break;

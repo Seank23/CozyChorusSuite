@@ -31,6 +31,8 @@ namespace CozyChorus
 
 		for (auto& channelState : m_AllPassState)
 			channelState.fill(0.0f);
+
+		SetParameters(VibeParameters{});
 	}
 
 	void VibeEffect::Process(const juce::dsp::ProcessContextReplacing<float>& context)

@@ -1,4 +1,5 @@
 #pragma once
+#include "LFO.h"
 
 #include <juce_dsp/juce_dsp.h>
 
@@ -23,5 +24,9 @@ namespace CozyChorus
 
 		// Clear internal state without reallocating.
 		virtual void Reset() = 0;
+
+	protected:
+		LFO m_LFO;
+		double m_SampleRate = 44100.0;
 	};
 }
