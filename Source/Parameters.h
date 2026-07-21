@@ -19,6 +19,7 @@ namespace CozyChorus
 		inline constexpr auto FlangerBaseDelay = "flangerBaseDelay";
 		inline constexpr auto PhaserStages = "phaserStages";
 		inline constexpr auto PhaserFeedback = "phaserFeedback";
+		inline constexpr auto VibeMode = "vibeMode";
 	}
 
 	// Selectable effect. Values must match the effectType choice order below.
@@ -96,6 +97,11 @@ namespace CozyChorus
 			"Feedback",
 			juce::NormalisableRange<float>(-95.0f, 95.0f, 0.1f, 0.4f),
 			0.0f));
+
+		layout.add(std::make_unique<juce::AudioParameterBool>(
+			juce::ParameterID{ ParameterIDs::VibeMode, 1 },
+			"Vibrato",
+			false));
 
 		return layout;
 	}

@@ -20,6 +20,56 @@ belongs here.
 
 ---
 
+## 2026-07-21 — Session 8: Milestone 4 — Vibe (Uni-Vibe, all-pass family) — suite DSP complete
+
+**Done:**
+- Implemented the Vibe (`Source/dsp/VibeEffect.{h,cpp}`) — the **last effect**, closing the all-pass
+  family and the whole DSP milestone track. Reuses the Phaser's TPT all-pass kernel with three deltas:
+  (1) **fixed 4 staggered stages** — one LFO-swept centre + a constant per-stage log offset
+  (`{−0.75, −0.25, +0.25, +0.75}` octaves, precomputed in `Prepare`), so `G = g/(1+g)` is recomputed
+  **per stage** (4 `tan()`/sample/channel); (2) an **asymmetric LFO owned by `VibeEffect`**
+  (`GetAsymmetricShape`: piecewise-linear phase warp, `ASYM_K = 0.35`, then a sine — a smooth, skewed
+  throb); (3) a **Chorus / Vibrato mode** (`effectiveMix = m_Vibrato ? 1.0f : mix`). **No feedback, no
+  delay buffer** — only fixed `std::array` all-pass state. `fc` swept 200 Hz–2 kHz in the log domain,
+  clamped to that range. Rate/Depth/Mix/Width all `SmoothedValue` (20 ms); LFO advances once per sample.
+- Added one Vibe-specific param `vibeMode` (`AudioParameterBool` "Vibrato", default Off) to the APVTS
+  (`Parameters.h`); wired `EffectType::Vibe → m_VibeEffect` in `PluginProcessor` (caches the `vibeMode`
+  atomic, builds `VibeParameters` per block, `Vibrato = load() > 0.5f`). With this, **`GetActiveEffect()`
+  routes every real selection to its own effect — `NullEffect` is now only the unreachable `default`
+  guard.**
+- Extended the shared `LFO` with a generic `GetPhase()` accessor (the only `LFO` change — the
+  asymmetric *shape* stays in `VibeEffect`, so the other three effects still use the default sine).
+- Extended the editor: a **"Vibrato" `ToggleButton`** (`m_VibeModeButton` + `ButtonAttachment`), shown
+  only when Vibe is selected via the same 30 Hz `Timer` visibility mechanism; it slots into the wrapping
+  grid generically (Vibe shows 4 shared knobs + the toggle = 5 controls). No layout-math change.
+- Updated `CLAUDE.md` (status → **M4 done, suite DSP complete**; milestones; architecture tree +
+  `NullEffect`/`LFO` notes; Vibe topology decision; Vibe DSP section + param table).
+
+**Decisions:**
+- **`VibeEffect` is a new sibling class**, not a subclass of `PhaserEffect` — the ~6-line TPT kernel is
+  copied; Vibe *removes* the variable stage count and feedback, so inheritance buys nothing.
+- **Asymmetric shape owned by the effect**, `LFO` stays shape-agnostic (just gains `GetPhase()`).
+- **Mode is a bool + toggle button**; Vibrato forces 100 % wet, so the shared Mix knob is a no-op in
+  Vibrato mode (documented, not greyed — greying is deferred editor polish).
+- Stagger spread and `ASYM_K` are **tuned by ear, not measured** — a clean musical approximation of the
+  hardware's mismatched-cap stage frequencies.
+
+**Next up:**
+- Build + audition M4 in the standalone host / DAW (Chorus-mode swirl vs. Vibrato-mode pitch wobble;
+  confirm the throb and stereo width), then commit (one commit for the milestone).
+- With all four effects done, the DSP track is complete — remaining work is the deferred **GUI polish
+  pass**: custom `LookAndFeel`, per-effect panels, LFO visualiser (possibly OpenGL).
+
+**Open questions / blockers:**
+- Vibe tuning is by-ear-pending: stagger spread (`±0.75` octave), `ASYM_K` throb amount, and the
+  200 Hz–2 kHz `fc` range want an audition against reference Uni-Vibe material. Fold into the GUI/tuning
+  polish pass.
+- Optional future params (deferred): expose `ASYM_K` / stagger spread; grey the Mix slider in Vibrato
+  mode once the custom `LookAndFeel` lands.
+- Still no `pluginval` / automated DSP test in-repo; verification remains a manual audition on this box.
+
+---
+
 ## 2026-07-20 — Session 7: Milestone 3 — Phaser (all-pass family)
 
 **Done:**

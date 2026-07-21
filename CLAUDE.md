@@ -9,8 +9,10 @@ works in mono and stereo. C++20 / JUCE 8 / CMake.
 
 ## Current status
 
-- **Phase:** Milestone 3 complete — Chorus + Flanger (delay-line family) **and Phaser** (all-pass
-  family) are implemented and audible. Milestone 4 (Vibe, all-pass family) is next — the last effect.
+- **Phase:** Milestone 4 complete — **all four effects are implemented and audible.** Chorus + Flanger
+  (delay-line family) and Phaser + **Vibe** (all-pass family) are done, so the suite's DSP milestone
+  track is finished. Only GUI polish (custom `LookAndFeel`, per-effect panels, LFO visualiser) remains
+  — a separate, deferred pass, not a milestone.
 - A hand-written **`CCSAudioProcessorEditor`** (rotary knobs + effect selector, per-effect control
   visibility) has replaced the generic editor. Custom `LookAndFeel` / LFO visualiser still deferred.
 - Builds as **VST3 + Standalone** via CMake + JUCE **8.0.14** with the `Visual Studio 18 2026`
@@ -96,7 +98,12 @@ Fixed order (delay-line family first, then all-pass family):
    modulates the all-pass cutoff, log-spaced **200 Hz–2 kHz**; **feedback** (±0.95) wraps the whole
    cascade for resonance. Rate/Depth/Mix/Width are the shared controls; **Stages + Feedback** are
    Phaser-only. All params smoothed. No delay buffer.
-5. **Milestone 4 — Vibe.** Phaser variant, staggered stages + asymmetric LFO (hardest, last).
+5. **Milestone 4 — Vibe. ✅ Done.** Uni-Vibe (all-pass family, the last effect): `VibeEffect` — a
+   cascade of **exactly 4** hand-rolled TPT all-pass stages, each **staggered** to its own break
+   frequency (fixed per-stage log offset around one LFO-swept centre), driven by an **asymmetric LFO**
+   (lamp/photocell throb, shaped inside `VibeEffect`), with a **Chorus / Vibrato mode** switch (Vibrato
+   = 100 % wet). **No feedback, no delay buffer.** Rate/Depth/Mix/Width are the shared controls; the
+   only Vibe-specific param is the `vibeMode` bool. All effects now exist — the effect list is complete.
 6. **GUI — in progress (functional).** A parameter-driven `CCSAudioProcessorEditor` now ships
    (rotary knobs, effect selector, per-effect control visibility). Still deferred: custom
    `LookAndFeel`, polished per-effect panels, and an LFO visualiser (possibly OpenGL).
@@ -159,12 +166,12 @@ Source/
     CCSAudioProcessorEditor.h / .cpp  // custom editor: effect selector + rotary knobs, per-effect control visibility (30 Hz Timer), wrapping-grid layout; createEditor() returns this
   dsp/
     ModulationEffect.h       // abstract base: Prepare(spec) / Process(context) / Reset()
-    NullEffect.h             // pass-through; still the fallback for the one effect not yet built (Vibe)
-    LFO.h / .cpp             // shared LFO: continuous phase, per-channel phase-offset reads, Hz rate; sine/triangle/saw/square implemented (Chorus + Flanger + Phaser use sine)
+    NullEffect.h             // pass-through; now ONLY the `default` guard in GetActiveEffect() — every built effect routes to itself
+    LFO.h / .cpp             // shared LFO: continuous phase, per-channel phase-offset reads, Hz rate; sine/triangle/saw/square (Chorus/Flanger/Phaser use sine); GetPhase() accessor lets Vibe apply its own asymmetric shape
     ChorusEffect.h / .cpp    // Chorus (delay-line family) — Milestone 1, done
     FlangerEffect.h / .cpp   // Flanger (delay-line family, feedback comb) — Milestone 2, done
     PhaserEffect.h / .cpp    // Phaser (all-pass family, TPT all-pass cascade + feedback) — Milestone 3, done
-    // VibeEffect added in Milestone 4
+    VibeEffect.h / .cpp      // Vibe (all-pass family, 4 staggered TPT stages + asymmetric LFO + Chorus/Vibrato mode, no feedback) — Milestone 4, done
 ```
 
 ### Design principle: two DSP families, one shared skeleton
@@ -220,6 +227,22 @@ All four are driven by a shared **LFO** and share **Rate / Depth / Mix / Stereo*
   (±0.95). Stereo width reuses the Chorus/Flanger per-channel LFO phase-offset trick. Rate/Depth/Mix/
   Width are the shared APVTS params; **Stages** (2–12, default 6) and **Feedback** (default 0) are
   Phaser-only. No delay line — this is the first effect that allocates no delay buffer.
+- **Vibe topology (M4):** the Phaser's all-pass skeleton, reworked into a Uni-Vibe by three deltas —
+  everything else (TPT kernel, exponential log sweep, per-channel width offset, POD-per-block dispatch,
+  show/hide editor) is reused. (1) **Fixed 4 stages, each staggered** to its own break frequency: one
+  LFO-swept centre plus a constant per-stage log offset (`{−0.75, −0.25, +0.25, +0.75}` octaves,
+  precomputed in `Prepare`), so `G = g/(1+g)` is **recomputed per stage** (4 `tan()`/sample/channel).
+  (2) **Asymmetric LFO owned by `VibeEffect`:** the shared `LFO` stays shape-agnostic and only exposes
+  `GetPhase()`; `VibeEffect::GetAsymmetricShape` warps the phase (piecewise-linear, `ASYM_K = 0.35`)
+  then takes a sine — a smooth, skewed throb, no `SetShape` call. (3) **Chorus / Vibrato mode**
+  (`vibeMode` **bool** + `ToggleButton`): Vibrato forces `effectiveMix = 1.0` (100 % wet, so the swept
+  group delay reads as pitch wobble); Chorus uses the shared Mix blend. **No feedback** (no
+  `m_FeedbackState`), **no delay buffer** — only fixed `std::array` all-pass state. `fc` clamped to the
+  200 Hz–2 kHz sweep range. Rate/Depth/Mix/Width are the shared params; the mode bool is the only
+  Vibe-specific param. Stagger spread + `ASYM_K` are **tuned by ear, not measured**.
+- **`NullEffect` is now only the guard:** with all four effects built, every real `EffectType`
+  selection routes to its own effect in `GetActiveEffect()`; `NullEffect` remains solely the
+  unreachable `default:` safety net.
 
 ---
 
@@ -319,10 +342,35 @@ block-rate `Advance()` bug that froze the sweep was caught and fixed before sign
 int 2–12 (not restricted to even). Sweep audibly present across the range; feedback lifts the resonant
 peaks. Tuning by ear against reference phaser material still open for a later polish pass.
 
-### Vibe (last — all-pass family, hardest)
-Phaser variant: **4 all-pass stages with staggered coefficients**, an **asymmetric LFO**
-(photocell/lamp emulation), and a **Chorus / Vibrato mode** switch (vibrato = 100% wet).
-Tune by ear against reference Uni-Vibe material.
+### Vibe (Milestone 4 — all-pass family, Uni-Vibe)
+- `input --> 4 staggered all-pass stages --> wet`; `output = dry*(1-mix) + wet*mix` (Chorus mode) or
+  `output = wet` (Vibrato mode, forced 100 % wet). **No feedback, no delay buffer.**
+- Cascade of **exactly 4** first-order TPT all-pass stages (same kernel as the Phaser). Each stage sits
+  at its **own** break frequency: one LFO-swept centre + a fixed per-stage **log offset**
+  (`{−0.75, −0.25, +0.25, +0.75}` octaves), so `g`/`G` are recomputed per stage.
+- The LFO modulates the swept centre in the **log domain** over **200 Hz–2 kHz**; Depth scales the
+  span, Rate sets speed — but the LFO waveform is **asymmetric** (owned by `VibeEffect`, not the shared
+  `LFO`): warp-then-sine with `ASYM_K = 0.35`, giving the lamp/photocell *throb*.
+- **Chorus / Vibrato mode** (`vibeMode` bool): Chorus = dry+wet via Mix (swirl); Vibrato = 100 % wet
+  (the swept group delay reads as pitch wobble). Vibrato overrides the Mix knob to 1.0 in the DSP.
+- Stereo: reuses the per-channel LFO phase offset; Width scales it.
+
+| Param | Range | Notes |
+|---|---|---|
+| Rate | 0.05–5 Hz | LFO speed (shared) |
+| Depth | 0–100% | sweep span (shared) |
+| Mix | 0–100% | dry/wet (shared); **ignored in Vibrato mode** (forced 100 % wet) |
+| Vibrato | Off/On | mode switch: Off = Chorus (blend), On = Vibrato (100 % wet). `AudioParameterBool`, default Off |
+| Stereo Width | 0–100% | L/R LFO phase offset (shared) |
+
+**Shipped M4:** functionally correct and RT-safe — all state (`m_AllPassState`) allocated in `Prepare`,
+Rate/Depth/Mix/Width smoothed over 20 ms, LFO phase advanced **once per sample**, no allocation in
+`Process`. Stages fixed at 4 (no `Stages` param); **no feedback** path at all — the Vibe can't ring, so
+`Reset()` only flushes the all-pass state. The asymmetric shape lives in `VibeEffect::GetAsymmetricShape`
+(the shared `LFO` gained only a generic `GetPhase()` accessor). Editor adds a **"Vibrato" toggle button**
+shown only for the Vibe (5 controls: the 4 shared knobs + the toggle). Stagger spread (`±0.75` octave)
+and `ASYM_K` are **tuned by ear, not measured** — a by-ear polish pass against reference Uni-Vibe
+material is still open.
 
 ---
 

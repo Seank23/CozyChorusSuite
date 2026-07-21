@@ -21,6 +21,7 @@ namespace CozyChorus
 
 		using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
 		using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
+		using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
 
 		PluginProcessor& m_Processor;
 		juce::AudioProcessorValueTreeState& m_APVTS; // = m_Processor.GetAPVTS()
@@ -35,11 +36,14 @@ namespace CozyChorus
 
 		juce::Slider m_StagesSlider, m_PhaserFeedbackSlider;
 
+		juce::ToggleButton m_VibeModeButton;
+
 		// Attachments — DECLARED AFTER the components so they destruct FIRST.
 		std::unique_ptr<ComboBoxAttachment> m_EffectAttachment;
 		std::unique_ptr<SliderAttachment> m_RateAtt, m_DepthAtt, m_MixAtt, m_WidthAtt;
 		std::unique_ptr<SliderAttachment> m_VoicesAtt, m_FlangerFeedbackAtt, m_BaseDelayAtt;
 		std::unique_ptr<SliderAttachment> m_StagesAtt, m_PhaserFeedbackAtt;
+		std::unique_ptr<ButtonAttachment> m_VibeModeAtt;
 
 		int m_LastEffectIndex = -1;
 

@@ -21,6 +21,7 @@ namespace CozyChorus
 		void SetShape(Shape shape) { m_Shape = shape; }
 
 		float GetValue(float phaseOffset = 0.0f) const;
+		float GetPhase() const { return m_Phase; }
 
 	private:
 		void UpdatePhaseIncrement();

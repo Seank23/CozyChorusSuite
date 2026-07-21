@@ -63,6 +63,9 @@ namespace CozyChorus
 		m_PhaserFeedbackSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
 		m_PhaserFeedbackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
 
+		addAndMakeVisible(m_VibeModeButton);
+		m_VibeModeButton.setButtonText("Vibrato");
+
 		m_EffectAttachment = std::make_unique<ComboBoxAttachment>(m_APVTS, ParameterIDs::EffectType, m_EffectSelector);
 		m_RateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Rate, m_RateSlider);
 		m_MixAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Mix, m_MixSlider);
@@ -73,6 +76,7 @@ namespace CozyChorus
 		m_BaseDelayAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerBaseDelay, m_BaseDelaySlider);
 		m_StagesAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserStages, m_StagesSlider);
 		m_PhaserFeedbackAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserFeedback, m_PhaserFeedbackSlider);
+		m_VibeModeAtt = std::make_unique<ButtonAttachment>(m_APVTS, ParameterIDs::VibeMode, m_VibeModeButton);
 
 		startTimerHz(30);
 		UpdateVisibility();
@@ -100,28 +104,29 @@ namespace CozyChorus
 		graphics.setFont(juce::Font(juce::FontOptions(13.0f)));
 		graphics.setColour(kCaptionText);
 
-		const auto captionFor = [this](const juce::Component* slider) -> juce::String
+		const auto captionFor = [this](const juce::Component* comp) -> juce::String
 		{
-			if (slider == &m_RateSlider) return "Rate";
-			if (slider == &m_DepthSlider) return "Depth";
-			if (slider == &m_MixSlider) return "Mix";
-			if (slider == &m_WidthSlider) return "Width";
-			if (slider == &m_VoicesSlider) return "Voices";
-			if (slider == &m_FlangerFeedbackSlider)  return "Feedback";
-			if (slider == &m_BaseDelaySlider) return "Base Delay";
-			if (slider == &m_StagesSlider) return "Stages";
-			if (slider == &m_PhaserFeedbackSlider) return "Feedback";
+			if (comp == &m_RateSlider) return "Rate";
+			if (comp == &m_DepthSlider) return "Depth";
+			if (comp == &m_MixSlider) return "Mix";
+			if (comp == &m_WidthSlider) return "Width";
+			if (comp == &m_VoicesSlider) return "Voices";
+			if (comp == &m_FlangerFeedbackSlider)  return "Feedback";
+			if (comp == &m_BaseDelaySlider) return "Base Delay";
+			if (comp == &m_StagesSlider) return "Stages";
+			if (comp == &m_PhaserFeedbackSlider) return "Feedback";
+			if (comp == &m_VibeModeButton) return "Vibrato";
 			return {};
 		};
 
-		for (auto* slider : GetAllComponents())
+		for (auto* comp : GetAllComponents())
 		{
-			if (!slider->isVisible())
+			if (!comp->isVisible())
 				continue;
 
-			const auto sliderBounds = slider->getBounds();
-			const juce::Rectangle<int> caption(sliderBounds.getX(), sliderBounds.getY() - kCaptionHeight, sliderBounds.getWidth(), kCaptionHeight);
-			graphics.drawText(captionFor(slider), caption, juce::Justification::centred);
+			const auto compBounds = comp->getBounds();
+			const juce::Rectangle<int> caption(compBounds.getX(), compBounds.getY() - kCaptionHeight, compBounds.getWidth(), kCaptionHeight);
+			graphics.drawText(captionFor(comp), caption, juce::Justification::centred);
 		}
 	}
 
@@ -148,6 +153,7 @@ namespace CozyChorus
 		m_BaseDelaySlider.setVisible(type == EffectType::Flanger);
 		m_StagesSlider.setVisible(type == EffectType::Phaser);
 		m_PhaserFeedbackSlider.setVisible(type == EffectType::Phaser);
+		m_VibeModeButton.setVisible(type == EffectType::Vibe);
 		RenderComponents();
 	}
 
@@ -195,6 +201,6 @@ namespace CozyChorus
 
 	std::vector<juce::Component*> CCSAudioProcessorEditor::GetAllComponents()
 	{
-		return { &m_RateSlider, &m_DepthSlider, &m_MixSlider, &m_WidthSlider, &m_VoicesSlider, &m_FlangerFeedbackSlider, &m_BaseDelaySlider, &m_StagesSlider, &m_PhaserFeedbackSlider };
+		return { &m_RateSlider, &m_DepthSlider, &m_MixSlider, &m_WidthSlider, &m_VoicesSlider, &m_FlangerFeedbackSlider, &m_BaseDelaySlider, &m_StagesSlider, &m_PhaserFeedbackSlider, &m_VibeModeButton };
 	}
 }
