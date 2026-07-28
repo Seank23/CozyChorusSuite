@@ -9,6 +9,7 @@
 #include "dsp/FlangerEffect.h"
 #include "dsp/PhaserEffect.h"
 #include "dsp/VibeEffect.h"
+#include "dsp/CharacterStage.h"
 
 #include <atomic>
 
@@ -62,10 +63,12 @@ namespace CozyChorus
 		FlangerEffect m_FlangerEffect;
 		PhaserEffect m_PhaserEffect;
 		VibeEffect m_VibeEffect;
+		CharacterStage m_CharacterStage;
 
 		// Cached atomic parameter pointer, read lock-free on the audio thread.
 		std::atomic<float>* m_EffectTypeParam = nullptr;
 		std::atomic<float>* m_MixParam = nullptr;
+		std::atomic<float>* m_WarmthParam = nullptr;
 
 		std::atomic<float>* m_ChorusRateParam = nullptr;
 		std::atomic<float>* m_ChorusDepthParam = nullptr;

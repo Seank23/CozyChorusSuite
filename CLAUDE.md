@@ -1,18 +1,28 @@
 # CozyChorus Suite
 
 A cross-platform audio plugin (**VST3 + AU + Standalone**): a suite of four classic
-guitar-pedal modulation effects — **Chorus, Flanger, Phaser, Vibe** (Uni-Vibe style).
-The user selects the active effect; each exposes its own controls. Guitar-oriented,
-works in mono and stereo. C++20 / JUCE 8 / CMake.
+guitar-pedal modulation effects — **Chorus, Flanger, Phaser, Vibe** (Uni-Vibe style) —
+plus a global **Character** (tape-warmth) stage on the output. The user selects the active
+effect; each exposes its own controls. Guitar-oriented, works in mono and stereo.
+C++20 / JUCE 8 / CMake.
 
 ---
 
 ## Current status
 
-- **Phase:** Milestone 4 complete — **all four effects are implemented and audible.** Chorus + Flanger
-  (delay-line family) and Phaser + **Vibe** (all-pass family) are done, so the suite's DSP milestone
-  track is finished. Only GUI polish (custom `LookAndFeel`, per-effect panels, LFO visualiser) remains
-  — a separate, deferred pass, not a milestone.
+- **Phase:** Milestone 5 complete — **all four effects plus the global Character (tape-warmth) stage
+  are implemented and audible.** Chorus + Flanger (delay-line family) and Phaser + **Vibe** (all-pass
+  family) finished the DSP-effect track at M4; **M5 adds a global `CharacterStage`** (oversampled
+  asymmetric-tanh saturation + high-cut tone, one **Warmth** macro) applied to the output after the
+  active effect. Only GUI polish (custom `LookAndFeel`, per-effect panels, LFO visualiser) remains — a
+  separate, deferred pass, not a milestone.
+- **Params are per-effect (post-M4):** Rate / Depth / Stereo Width were split from shared params into
+  **per-effect** APVTS params (`chorusRate`, `flangerRate`, …), so each effect carries its own defaults.
+  **`mix` is the only shared *effect* param**; **`warmth`** is a separate **global stage** param (the
+  Character stage, not an effect control).
+- **Character stage reports latency (PDC):** the 2× oversampler adds a few samples of latency, reported
+  once via `setLatencySamples(m_CharacterStage.GetLatencySamples())` in `prepareToPlay` — the suite's
+  first use of host delay compensation.
 - A hand-written **`CCSAudioProcessorEditor`** (rotary knobs + effect selector, per-effect control
   visibility) has replaced the generic editor. Custom `LookAndFeel` / LFO visualiser still deferred.
 - Builds as **VST3 + Standalone** via CMake + JUCE **8.0.14** with the `Visual Studio 18 2026`
@@ -96,15 +106,22 @@ Fixed order (delay-line family first, then all-pass family):
 4. **Milestone 3 — Phaser. ✅ Done.** All-pass cascade (new core, first non-delay-line effect):
    `PhaserEffect` — a cascade of N (2–12) hand-rolled one-pole **TPT all-pass** stages; the shared LFO
    modulates the all-pass cutoff, log-spaced **200 Hz–2 kHz**; **feedback** (±0.95) wraps the whole
-   cascade for resonance. Rate/Depth/Mix/Width are the shared controls; **Stages + Feedback** are
+   cascade for resonance. Rate/Depth/Width are per-effect controls (Mix is the only shared param); **Stages + Feedback** are
    Phaser-only. All params smoothed. No delay buffer.
 5. **Milestone 4 — Vibe. ✅ Done.** Uni-Vibe (all-pass family, the last effect): `VibeEffect` — a
    cascade of **exactly 4** hand-rolled TPT all-pass stages, each **staggered** to its own break
    frequency (fixed per-stage log offset around one LFO-swept centre), driven by an **asymmetric LFO**
    (lamp/photocell throb, shaped inside `VibeEffect`), with a **Chorus / Vibrato mode** switch (Vibrato
-   = 100 % wet). **No feedback, no delay buffer.** Rate/Depth/Mix/Width are the shared controls; the
+   = 100 % wet). **No feedback, no delay buffer.** Rate/Depth/Width are per-effect controls (Mix is the only shared param); the
    only Vibe-specific param is the `vibeMode` bool. All effects now exist — the effect list is complete.
-6. **GUI — in progress (functional).** A parameter-driven `CCSAudioProcessorEditor` now ships
+6. **Milestone 5 — Character (tape warmth). ✅ Done.** First non-effect DSP: a global `CharacterStage`
+   (not a `ModulationEffect`) applied to the output **after** the active effect. **2× oversampled**
+   (`juce::dsp::Oversampling`, min-phase half-band IIR) **asymmetric-tanh saturation** with a built-in
+   slope-normalised makeup (unity small-signal gain) for even-harmonic "tape" colour, followed by a
+   one-pole **high-cut** (`FirstOrderTPTFilter`). A single **Warmth** macro drives both drive and
+   cutoff. Global `warmth` param (default 30 %). Reports oversampler latency via `setLatencySamples`
+   (first PDC use). Wow/flutter + vinyl noise deferred to a later 5b.
+7. **GUI — in progress (functional).** A parameter-driven `CCSAudioProcessorEditor` now ships
    (rotary knobs, effect selector, per-effect control visibility). Still deferred: custom
    `LookAndFeel`, polished per-effect panels, and an LFO visualiser (possibly OpenGL).
 
@@ -160,7 +177,7 @@ own naming, and the **JUCE submodule is never restyled**.
 
 ```
 Source/
-  PluginProcessor.h / .cpp   // AudioProcessor: owns APVTS + effect instances; routes processBlock to active effect
+  PluginProcessor.h / .cpp   // AudioProcessor: owns APVTS + effect instances + CharacterStage; routes processBlock to active effect, then runs the Character stage on the output; reports oversampler latency via setLatencySamples
   Parameters.h               // parameter IDs + APVTS layout in one place
   Editor/
     CCSAudioProcessorEditor.h / .cpp  // custom editor: effect selector + rotary knobs, per-effect control visibility (30 Hz Timer), wrapping-grid layout; createEditor() returns this
@@ -172,6 +189,7 @@ Source/
     FlangerEffect.h / .cpp   // Flanger (delay-line family, feedback comb) — Milestone 2, done
     PhaserEffect.h / .cpp    // Phaser (all-pass family, TPT all-pass cascade + feedback) — Milestone 3, done
     VibeEffect.h / .cpp      // Vibe (all-pass family, 4 staggered TPT stages + asymmetric LFO + Chorus/Vibrato mode, no feedback) — Milestone 4, done
+    CharacterStage.h / .cpp  // Character (global tape-warmth stage, NOT a ModulationEffect): 2x oversampled asymmetric-tanh saturation + one-pole high-cut, single Warmth macro — Milestone 5, done
 ```
 
 ### Design principle: two DSP families, one shared skeleton
@@ -181,7 +199,8 @@ Source/
 - **All-pass family** — Phaser, Vibe: a cascade of first-order all-pass filters
   (vibe = phaser with staggered stages + asymmetric LFO).
 
-All four are driven by a shared **LFO** and share **Rate / Depth / Mix / Stereo** controls.
+All four are driven by a shared **LFO** and expose the same control set — **Rate / Depth / Stereo Width**,
+now **per-effect** APVTS params (each with its own default), plus a shared **Mix**.
 
 ### Settled design decisions
 
@@ -197,6 +216,15 @@ All four are driven by a shared **LFO** and share **Rate / Depth / Mix / Stereo*
   builds a plain per-effect POD (`ChorusParameters`, percentages converted to 0–1) and hands it to
   `ChorusEffect::SetParameters`, which feeds per-control `SmoothedValue`s. Effects expose their own
   `SetParameters(const XxxParameters&)` rather than reading the APVTS directly.
+- **Per-effect Rate/Depth/Width params (post-M4):** Rate, Depth and Stereo Width were split from shared
+  APVTS params into **per-effect** params — `chorusRate`/`chorusDepth`/`chorusWidth`, and likewise
+  `flanger*`/`phaser*`/`vibe*` — each defaulting from that effect's `XxxParameters` POD in
+  `CreateParameterLayout()`. **`mix` is now the only shared *effect* param** (the M5 `warmth` param is
+  global to the Character stage, not an effect control). Rationale: a single shared knob
+  can't carry four different sensible defaults, so per-effect params let every effect boot at its own
+  sweet spot and automate independently. The POD-per-block dispatch is unchanged (only the source
+  param IDs moved); the editor holds a matching per-effect slider + attachment set, shown/hidden by
+  selection.
 - **Stereo width = LFO phase offset (M1):** both channels read one continuous LFO; the right
   channel is read at `+width*0.25` cycle (up to 90° at 100%), so Width 0 % ⇒ mono-correlated.
   Chorus is a bipolar sine around a 20 ms base delay, ±7 ms at full depth.
@@ -210,10 +238,11 @@ All four are driven by a shared **LFO** and share **Rate / Depth / Mix / Stereo*
   before write, so the minimum effective delay is 1 sample (hence `MIN_DELAY_SAMPLES = 1`). Base
   delay 0.5–5 ms; the LFO sweeps the delay **upward** from base by up to +5 ms (`0.5 + 0.5·sin`,
   unipolar); feedback ±0.95; stereo width reuses the Chorus per-channel phase-offset trick.
-  Rate/Depth/Mix/Width are the **same APVTS params** as Chorus (shared controls); Feedback + Base
-  Delay are Flanger-only.
+  Rate/Depth/Width are **per-effect params** (`flangerRate`/`flangerDepth`/`flangerWidth`); `mix` is the
+  only shared param; Feedback + Base Delay are Flanger-only.
 - **Editor (M2, extended M3):** replaced `GenericAudioProcessorEditor` with a hand-written
-  `CCSAudioProcessorEditor` (`Source/Editor/`). One shared set of rotary sliders + an effect
+  `CCSAudioProcessorEditor` (`Source/Editor/`). A **per-effect** set of rotary sliders (each effect owns
+  its own Rate/Depth/Width knobs) + a shared **Mix** knob and an effect
   selector; a 30 Hz `Timer` watches the `effectType` param and shows/hides the per-effect controls
   (Voices for Chorus; Feedback + Base Delay for Flanger; **Stages + Feedback for Phaser**). `resized()`
   lays the *visible* controls out in a wrapping grid; `paint()` fills the background and draws the
@@ -224,9 +253,9 @@ All four are driven by a shared **LFO** and share **Rate / Depth / Mix / Stereo*
   **log domain** (centre/half-span precomputed in `Prepare` from `MIN_FC_HZ=200`/`MAX_FC_HZ=2000`), so
   `fc = exp(logCenter + logHalfSpan·depth·lfo)`, clamped to the range. **Feedback** wraps the whole
   cascade: `input += feedbackState·feedback` before the stages, `feedbackState = cascadeOutput` after
-  (±0.95). Stereo width reuses the Chorus/Flanger per-channel LFO phase-offset trick. Rate/Depth/Mix/
-  Width are the shared APVTS params; **Stages** (2–12, default 6) and **Feedback** (default 0) are
-  Phaser-only. No delay line — this is the first effect that allocates no delay buffer.
+  (±0.95). Stereo width reuses the Chorus/Flanger per-channel LFO phase-offset trick. Rate/Depth/
+  Width are **per-effect params** (`phaserRate`/…); `mix` is the only shared param; **Stages** (2–12,
+  default 6) and **Feedback** (default 0) are Phaser-only. No delay line — this is the first effect that allocates no delay buffer.
 - **Vibe topology (M4):** the Phaser's all-pass skeleton, reworked into a Uni-Vibe by three deltas —
   everything else (TPT kernel, exponential log sweep, per-channel width offset, POD-per-block dispatch,
   show/hide editor) is reused. (1) **Fixed 4 stages, each staggered** to its own break frequency: one
@@ -238,11 +267,36 @@ All four are driven by a shared **LFO** and share **Rate / Depth / Mix / Stereo*
   (`vibeMode` **bool** + `ToggleButton`): Vibrato forces `effectiveMix = 1.0` (100 % wet, so the swept
   group delay reads as pitch wobble); Chorus uses the shared Mix blend. **No feedback** (no
   `m_FeedbackState`), **no delay buffer** — only fixed `std::array` all-pass state. `fc` clamped to the
-  200 Hz–2 kHz sweep range. Rate/Depth/Mix/Width are the shared params; the mode bool is the only
-  Vibe-specific param. Stagger spread + `ASYM_K` are **tuned by ear, not measured**.
+  200 Hz–2 kHz sweep range. Rate/Depth/Width are **per-effect params** (`vibeRate`/…); `mix` is the only
+  shared param; the mode bool is the only Vibe-specific param. Stagger spread + `ASYM_K` are **tuned by ear, not measured**.
 - **`NullEffect` is now only the guard:** with all four effects built, every real `EffectType`
   selection routes to its own effect in `GetActiveEffect()`; `NullEffect` remains solely the
   unreachable `default:` safety net.
+- **Character stage (M5):** a **global** tape-warmth stage, deliberately **not** a `ModulationEffect`
+  and **not** in the `effectType` switch — `PluginProcessor` owns one `CharacterStage m_CharacterStage`
+  and runs it **unconditionally on the output after** `GetActiveEffect().Process(context)`, so it
+  colours whichever effect is active (and the dry signal too, since it sits post-Mix). It reuses the
+  effects' `Prepare/Process/Reset` + POD-`SetParameters` shape for consistency but stands alone. DSP:
+  **2× oversampled** (`juce::dsp::Oversampling`, `filterHalfBandPolyphaseIIR` = minimum-phase, chosen
+  for low latency) **asymmetric-tanh saturation** —
+  `y = (tanh(drive·(x + DC_BIAS)) − tanh(drive·DC_BIAS)) · invS0`, with `drive = 1 + w·DRIVE_MAX`
+  (`DRIVE_MAX = 4`), `DC_BIAS = 0.15` giving even harmonics, and `invS0 = 1/(drive·(1 − tanh²(drive·DC_BIAS)))`
+  a **slope-normalised makeup** (unity small-signal gain, so Warmth compresses peaks rather than acting
+  as a volume knob) — followed by a one-pole **high-cut** (`FirstOrderTPTFilter`, lowpass) swept
+  `fc = MAX_WARMTH_CUTOFF_HZ·(MIN/MAX)^w` from **18 kHz → 6.5 kHz**. One **Warmth** macro (0–1) drives
+  both drive and cutoff; `warmth` is smoothed 20 ms but read **once per block** (coefficients constant
+  per block). All state (oversampler, filter) allocated in `Prepare`; `Process` is allocation-free
+  (`processSamplesUp`/`Down` reuse the oversampler's internal buffers). **Latency:** the oversampler's
+  IIR adds a few samples, reported once via `setLatencySamples(m_CharacterStage.GetLatencySamples())`
+  in `prepareToPlay` (the suite's first PDC). **`warmth` is a global stage param** (default 30 %), not
+  an effect control and independent of `effectType`. Wow/flutter + vinyl noise are deferred to a later
+  **5b**. Drive/bias/cutoff endpoints are **tuned by ear**.
+  - **Editor:** a **Warmth** rotary knob, always visible (like Mix, independent of `effectType`), added
+    right after the Mix knob in `GetAllComponents()`; caption "Warmth".
+  - **Shipped-M5 fix:** the saturation loop originally iterated the *pre*-oversampling sample/channel
+    counts (`< numSamples - 1`, `< numChannels - 1`), leaving the back half of every 2× block
+    unsaturated → a per-block discontinuity heard as low-frequency crackle, and skipping the last
+    channel. Fixed to iterate the oversampled block's own `getNumSamples()`/`getNumChannels()`.
 
 ---
 
@@ -299,12 +353,12 @@ delay 20 ms, ±7 ms modulation, params smoothed over 20 ms.
 
 | Param | Range | Notes |
 |---|---|---|
-| Rate | 0.05–5 Hz | LFO speed (shared with Chorus) |
-| Depth | 0–100% | delay-sweep amount, up to +5 ms (shared) |
+| Rate | 0.05–5 Hz | LFO speed (per-effect) |
+| Depth | 0–100% | delay-sweep amount, up to +5 ms (per-effect) |
 | Mix | 0–100% | dry/wet (shared) |
 | Feedback | −95…95% | comb feedback, mapped to ±0.95 coefficient (skew 0.4, default 45%) |
 | Base Delay | 0.2–5 ms | shortest delay / sweep floor (default 1 ms) |
-| Stereo Width | 0–100% | L/R LFO phase offset (shared) |
+| Stereo Width | 0–100% | L/R LFO phase offset (per-effect) |
 
 **Shipped M2 (+ tuning):** functionally correct and RT-safe — verified by offline impulse-response
 measurement (feedback lifts the resonant peak 0 → +14.6 dB at fb 0.9; base delay moves the comb by
@@ -312,8 +366,8 @@ measurement (feedback lifts the resonant peak 0 → +14.6 dB at fb 0.9; base del
 **defaults to 45%** (audible resonance out of the box) with a **skewed taper** (`skew 0.4`, so the
 knob's travel is no longer bunched into the top quarter), and the **base delay default dropped to
 1 ms** (range widened to 0.2–5 ms). Remaining caveat, not a bug: the sweep is still **upward-only from
-base**, so the comb's top-end reach is limited and there's no separate Flanger Depth scaling (it shares
-Chorus's). See DEVLOG Session 6.
+base**, so the comb's top-end reach is limited, and its own `flangerDepth` param reuses Chorus's
+depth-scaling behaviour rather than defining a bespoke range. See DEVLOG Session 6.
 
 Through-zero flanging is an optional later refinement.
 
@@ -329,12 +383,12 @@ Through-zero flanging is an optional later refinement.
 
 | Param | Range | Notes |
 |---|---|---|
-| Rate | 0.05–5 Hz | LFO speed (shared) |
-| Depth | 0–100% | cutoff-sweep amount (shared) |
+| Rate | 0.05–5 Hz | LFO speed (per-effect) |
+| Depth | 0–100% | cutoff-sweep amount (per-effect) |
 | Mix | 0–100% | dry/wet (shared) |
 | Stages | 2–12 | number of all-pass stages (default 6) |
 | Feedback | −95…95% | cascade feedback, mapped to ±0.95 coefficient (default 0) |
-| Stereo Width | 0–100% | L/R LFO phase offset (shared) |
+| Stereo Width | 0–100% | L/R LFO phase offset (per-effect) |
 
 **Shipped M3:** functionally correct and RT-safe — all state (`m_AllPassState`, `m_FeedbackState`)
 allocated in `Prepare`, params smoothed over 20 ms, LFO phase advanced **once per sample** (a
@@ -357,20 +411,44 @@ peaks. Tuning by ear against reference phaser material still open for a later po
 
 | Param | Range | Notes |
 |---|---|---|
-| Rate | 0.05–5 Hz | LFO speed (shared) |
-| Depth | 0–100% | sweep span (shared) |
+| Rate | 0.05–5 Hz | LFO speed (per-effect) |
+| Depth | 0–100% | sweep span (per-effect) |
 | Mix | 0–100% | dry/wet (shared); **ignored in Vibrato mode** (forced 100 % wet) |
 | Vibrato | Off/On | mode switch: Off = Chorus (blend), On = Vibrato (100 % wet). `AudioParameterBool`, default Off |
-| Stereo Width | 0–100% | L/R LFO phase offset (shared) |
+| Stereo Width | 0–100% | L/R LFO phase offset (per-effect) |
 
 **Shipped M4:** functionally correct and RT-safe — all state (`m_AllPassState`) allocated in `Prepare`,
 Rate/Depth/Mix/Width smoothed over 20 ms, LFO phase advanced **once per sample**, no allocation in
 `Process`. Stages fixed at 4 (no `Stages` param); **no feedback** path at all — the Vibe can't ring, so
 `Reset()` only flushes the all-pass state. The asymmetric shape lives in `VibeEffect::GetAsymmetricShape`
 (the shared `LFO` gained only a generic `GetPhase()` accessor). Editor adds a **"Vibrato" toggle button**
-shown only for the Vibe (5 controls: the 4 shared knobs + the toggle). Stagger spread (`±0.75` octave)
+shown only for the Vibe (5 controls: 4 knobs — its Rate/Depth/Width + the shared Mix — plus the toggle). Stagger spread (`±0.75` octave)
 and `ASYM_K` are **tuned by ear, not measured** — a by-ear polish pass against reference Uni-Vibe
 material is still open.
+
+### Character (Milestone 5 — global tape-warmth stage, not an effect)
+
+- Runs on the output **after** the active effect (post-Mix), not selected by `effectType`. Signal path:
+  `input → 2× upsample → asymmetric-tanh saturation → downsample → one-pole high-cut → output`.
+- **Saturation:** `y = (tanh(drive·(x + BIAS)) − tanh(drive·BIAS)) · invS0` at 2× oversampling
+  (`juce::dsp::Oversampling`, minimum-phase half-band IIR for low latency). `drive = 1 + Warmth·4`;
+  `BIAS = 0.15` shifts the operating point off-centre for **even-harmonic** colour; the `− tanh(drive·BIAS)`
+  term re-centres DC; `invS0 = 1/(drive·(1 − tanh²(drive·BIAS)))` normalises the **slope at 0** so
+  small signals pass at unity gain (built-in makeup — Warmth compresses peaks, it is *not* a volume knob).
+- **Tone:** one-pole **high-cut** (`FirstOrderTPTFilter`, lowpass) after downsampling, swept by the same
+  macro `fc = 18 kHz·(6.5/18)^Warmth` → 18 kHz at 0 %, 6.5 kHz at 100 %.
+- **Latency:** the oversampler adds a few samples; reported via `setLatencySamples` (PDC).
+
+| Param | Range | Notes |
+|---|---|---|
+| Warmth | 0–100% | **global** macro (default 30 %); drives saturation amount **and** high-cut together |
+
+**Shipped M5:** functionally correct and RT-safe — oversampler + filter allocated in `Prepare`,
+`Process` allocation-free, Warmth smoothed 20 ms (read once per block). One post-ship fix: the
+saturation loop was iterating the pre-oversampling sample/channel counts, leaving half of every 2×
+block unsaturated (low-frequency crackle) and skipping the last channel — corrected to iterate the
+oversampled block's own extents. Endpoints (`DRIVE_MAX`, `BIAS`, cutoff range) are **tuned by ear**.
+Wow/flutter + vinyl noise deferred to a later **5b**.
 
 ---
 

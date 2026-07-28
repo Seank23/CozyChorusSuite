@@ -20,6 +20,94 @@ belongs here.
 
 ---
 
+## 2026-07-28 — Session 10: Milestone 5 — Character (tape-warmth) stage
+
+**Done:**
+- Implemented the **Character stage** (`Source/dsp/CharacterStage.{h,cpp}`) — the first non-effect DSP
+  and the first **global** processor. It is **not** a `ModulationEffect` and **not** in the `effectType`
+  switch: `PluginProcessor` owns one `m_CharacterStage` and runs it **unconditionally on the output
+  after** `GetActiveEffect().Process(context)`, so it colours whichever effect is active (and the dry
+  signal, since it sits post-Mix). Reuses the effects' `Prepare`/`Process`/`Reset` + POD-`SetParameters`
+  shape for consistency.
+- DSP: **2× oversampled** (`juce::dsp::Oversampling`, `filterHalfBandPolyphaseIIR` = minimum-phase for
+  low latency) **asymmetric-tanh saturation** —
+  `y = (tanh(drive·(x+BIAS)) − tanh(drive·BIAS))·invS0`, `drive = 1 + Warmth·4`, `BIAS = 0.15` (even
+  harmonics), `invS0` = slope-normalised makeup (unity small-signal gain, so Warmth compresses peaks
+  rather than raising level) — then a one-pole **high-cut** (`FirstOrderTPTFilter`) swept 18 kHz → 6.5 kHz.
+  A single **Warmth** macro drives both.
+- Wiring: global `warmth` param (`AudioParameterFloat`, 0–100 %, default **30**, cached atomic in the
+  processor); `CharacterStageParameters` POD built each block from it; `m_CharacterStage.Prepare(spec)`
+  in `prepareToPlay` followed by **`setLatencySamples(m_CharacterStage.GetLatencySamples())`** — the
+  suite's **first PDC / host delay compensation**. Editor gains a **Warmth** rotary knob, always visible
+  like Mix (independent of `effectType`), placed right after Mix.
+- **Crackle fix (user-reported):** at high Warmth the saturation loop iterated the *pre*-oversampling
+  sample/channel counts (`< numSamples - 1`, `< numChannels - 1`), so the back half of every 2× block
+  passed through unsaturated → a per-block discontinuity heard as low-frequency crackle (bit-crusher-like),
+  and the last channel was skipped (right channel unprocessed in stereo). Fixed to iterate the
+  oversampled block's own `getNumSamples()`/`getNumChannels()`; dropped the now-unused `numChannels`
+  local. Release VST3 rebuilds clean (only pre-existing Phaser/Vibe `size_t→int` warnings remain).
+- Updated `CLAUDE.md` (Current status, build-order list — M5 added / GUI bumped to 7, `Source/` tree,
+  a Character settled-design decision, and a Character DSP-reference section + param table) and added
+  this DEVLOG entry.
+
+**Decisions:**
+- **Global post-effect placement, one Warmth macro** — brand-consistent "Cozy" voice with a single
+  control; the consequence (colours even a fully-dry signal, since it's post-Mix) was accepted.
+- **Slope-normalised makeup** (`invS0`) over endpoint normalisation — keeps small-signal gain at unity
+  so Warmth reads as *tone/compression*, not loudness; avoids the "louder = better" pitfall.
+- **2× minimum-phase IIR oversampling** — enough headroom against tanh aliasing while keeping latency to
+  a few samples (matters for live guitar), at the cost of some phase non-linearity (inaudible here).
+- **Tape voicing, core only** — saturation + high-cut this pass; wow/flutter + vinyl noise deferred to
+  a later **5b**.
+
+**Next up:**
+- Optional **5b**: wow/flutter (slow pitch drift) + subtle vinyl/tape noise for more character.
+- By-ear tuning of the Character endpoints (`DRIVE_MAX`, `BIAS`, cutoff range) alongside the still-open
+  per-effect default-value tuning (Vibe stagger/`ASYM_K`, Phaser, Flanger).
+- Then the deferred **GUI polish pass**: custom `LookAndFeel`, per-effect panels, LFO visualiser; grey
+  the Mix knob in Vibe's Vibrato mode.
+
+**Open questions / blockers:**
+- Warmth coefficients update **once per block** (not per sample) — fine at static settings; if faint
+  stepping is audible while *automating* Warmth, move the drive/cutoff recompute per-sample.
+- Heavy asymmetric compression at max Warmth (drive 5 ⇒ ~18 dB peak reduction on full-scale input) — a
+  voicing choice; lower `DRIVE_MAX` if it feels too quiet/dark, don't touch the normalisation.
+- Unchanged from Session 9: by-ear tuning still pending; still no `pluginval` / automated DSP test in-repo.
+
+---
+
+## 2026-07-22 — Session 9: Per-effect Rate/Depth/Width params + doc reconciliation
+
+**Done:**
+- Recorded a design change that had drifted ahead of the docs: **Rate / Depth / Stereo Width** are now
+  **per-effect** APVTS params (`chorusRate`/`chorusDepth`/`chorusWidth`, and likewise `flanger*` /
+  `phaser*` / `vibe*`), each defaulting from that effect's own `XxxParameters` POD in
+  `CreateParameterLayout()`. **`mix` is the only remaining shared param.** Already wired end-to-end —
+  `PluginProcessor` caches the per-effect atomics and loads each in its `processBlock` case, and
+  `CCSAudioProcessorEditor` holds a per-effect slider + attachment set toggled by the existing 30 Hz
+  visibility `Timer`. Effect DSP unchanged (only the source param IDs moved).
+- Reconciled `CLAUDE.md` to match: **Current status** (new per-effect-params bullet); Phaser/Vibe
+  **milestone bullets**; the **Design-principle** line; the Flanger/Phaser/Vibe **topology decisions**
+  and the **Editor decision**; a new **per-effect-params settled-design bullet**; and the
+  Flanger/Phaser/Vibe **parameter tables** (Rate/Depth/Width re-tagged per-effect, Mix stays shared).
+  Added this DEVLOG entry.
+
+**Decisions:**
+- **Per-effect params over one shared set** — the motivation is per-effect defaults; a single shared
+  param can't carry four different sensible defaults. `mix` stays shared for one consistent dry/wet feel
+  across the suite.
+
+**Next up:**
+- The payoff: dial in the actual per-effect default values in the `XxxParameters` PODs — this is where
+  the deferred by-ear tuning (Vibe stagger/`ASYM_K`, Phaser, Flanger) now naturally lands.
+- Then the deferred **GUI polish pass**: custom `LookAndFeel`, per-effect panels, LFO visualiser; grey
+  the Mix knob in Vibe's Vibrato mode.
+
+**Open questions / blockers:**
+- Unchanged from Session 8: by-ear tuning still pending; still no `pluginval` / automated DSP test in-repo.
+
+---
+
 ## 2026-07-21 — Session 8: Milestone 4 — Vibe (Uni-Vibe, all-pass family) — suite DSP complete
 
 **Done:**

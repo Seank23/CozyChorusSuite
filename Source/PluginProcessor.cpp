@@ -11,6 +11,7 @@ namespace CozyChorus
 	{
 		m_EffectTypeParam = m_APVTS.getRawParameterValue(ParameterIDs::EffectType);
 		m_MixParam = m_APVTS.getRawParameterValue(ParameterIDs::Mix);
+		m_WarmthParam = m_APVTS.getRawParameterValue(ParameterIDs::Warmth);
 
 		m_ChorusRateParam = m_APVTS.getRawParameterValue(ParameterIDs::ChorusRate);
 		m_ChorusDepthParam = m_APVTS.getRawParameterValue(ParameterIDs::ChorusDepth);
@@ -47,6 +48,10 @@ namespace CozyChorus
 		m_FlangerEffect.Prepare(spec);
 		m_PhaserEffect.Prepare(spec);
 		m_VibeEffect.Prepare(spec);
+		m_CharacterStage.Prepare(spec);
+
+		setLatencySamples(m_CharacterStage.GetLatencySamples());
+
 	}
 
 	void PluginProcessor::releaseResources()
@@ -56,6 +61,7 @@ namespace CozyChorus
 		m_FlangerEffect.Reset();
 		m_PhaserEffect.Reset();
 		m_VibeEffect.Reset();
+		m_CharacterStage.Reset();
 	}
 
 	bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -155,6 +161,11 @@ namespace CozyChorus
 		}
 
 		GetActiveEffect().Process(context);
+
+		CharacterStageParameters charParams{};
+		charParams.Warmth = std::clamp(m_WarmthParam->load() / 100.0f, 0.0f, 1.0f);
+		m_CharacterStage.SetParameters(charParams);
+		m_CharacterStage.Process(context);
 	}
 
 	juce::AudioProcessorEditor* PluginProcessor::createEditor()

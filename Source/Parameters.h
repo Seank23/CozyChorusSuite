@@ -14,6 +14,7 @@ namespace CozyChorus
 	{
 		inline constexpr auto EffectType = "effectType";
 		inline constexpr auto Mix = "mix";
+		inline constexpr auto Warmth = "warmth";
 
 		inline constexpr auto ChorusRate = "chorusRate";
 		inline constexpr auto ChorusDepth = "chorusDepth";
@@ -71,6 +72,11 @@ namespace CozyChorus
 			"Mix",
 			juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
 			50.0f));
+		layout.add(std::make_unique<juce::AudioParameterFloat>(
+			juce::ParameterID{ ParameterIDs::Warmth, 1 },
+			"Warmth",
+			juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
+			30.0f));
 
 		layout.add(std::make_unique<juce::AudioParameterFloat>(
 			juce::ParameterID{ ParameterIDs::ChorusRate, 1 },
