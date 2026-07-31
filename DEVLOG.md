@@ -20,6 +20,67 @@ belongs here.
 
 ---
 
+## 2026-07-31 — Session 11: Milestone 5b — Character tape age (wow/flutter)
+
+**Done:**
+- Added **wow/flutter tape-age** to the existing `CharacterStage` (user-implemented; I verified + guided).
+  It runs **first in `Process`, before the oversampled saturation**: a modulated fractional delay
+  (`juce::dsp::DelayLine<Lagrange3rd>`, 2 ms centre ± 1.5 ms span, `+4` headroom samples) whose delay is
+  `(CENTER_DELAY_MS + HALF_SPAN_DELAY_MS·mod·Age)·0.001·fs`.
+- `mod = WOW_WEIGHT·wow + FLUTTER_WEIGHT·flutter + NOISE_WEIGHT·drift` (weights **0.8 / 0.04 / 0.02**):
+  two `LFO` sines (**wow 0.556 Hz**, **flutter 12 Hz**, advanced once per sample) plus **band-limited
+  random drift** — one `juce::Random` sample **per block**, made bipolar and run through a one-pole LPF
+  (`NOISE_LPF_HZ = 2 Hz`, coeff precomputed in `Prepare`) with a `1/√(coeff/2)` **makeup gain** to
+  restore amplitude after the heavy lowpass. **One shared `mod`/delay across channels** (mono-correlated,
+  physically correct for a single transport). **No feedback.**
+- New global **`age`** param (`AudioParameterFloat`, 0–100 %, default **30**, cached atomic in the
+  processor, smoothed 20 ms, read **per sample**); scales `mod`, so Age 0 % ⇒ static 2 ms delay
+  (inaudible) and 100 % ⇒ full wander. Editor gains an **Age** rotary knob, always visible like Warmth,
+  placed right after it. `Reset()` now also flushes the delay line, both LFOs, the noise state, and
+  the Age smoother.
+- **Also retuned Warmth (M5) by ear during this pass:** `DRIVE_MAX` **4 → 2.5**, high-cut floor
+  `MIN_WARMTH_CUTOFF_HZ` **6.5 kHz → 4 kHz** (so `drive = 1 + Warmth·2.5`, cut 18 kHz → 4 kHz).
+- Updated `CLAUDE.md` (Phase/Current status, params bullet, latency bullet, build-order — added
+  Milestone 5b / GUI bumped to 8, `Source/` tree comment, a Character tape-age settled-design decision,
+  Warmth-number reconciliation, and the DSP-reference Character section + Age param row) and added this
+  DEVLOG entry.
+
+**Verify/fix during the pass:**
+- **Age was inaudible (0 % vs 100 % identical):** `SetParameters` set only `m_Warmth` and never
+  `m_Age`, so the smoother stayed pinned at 0 and zeroed the whole `mod·Age` term — the delay sat static
+  at 2 ms. Fixed by adding `m_Age.setTargetValue(params.Age)`.
+- **Raw random gargled:** the first cut sampled `m_Random.nextFloat()` per sample (full-bandwidth,
+  unipolar → DC-biased) → harsh noise, not drift. Replaced with the bipolar per-block sample + 2 Hz
+  one-pole LPF + makeup path above.
+- Flutter deliberately carries a **much smaller weight** than wow (0.04 vs 0.8): equal weight would make
+  12 Hz swing pitch ~20× harder than 0.556 Hz for the same delay amplitude → seasick.
+
+**Decisions:**
+- **Wow/flutter only — vinyl/tape noise dropped** (user call). A single **Age** macro over the whole
+  modulation, mirroring Warmth: one knob, brand-consistent "Cozy" simplicity.
+- **Pitch modulation via time-varying fractional delay** (Lagrange3rd) rather than a resampler — reuses
+  the delay-line family's kernel and is allocation-free once prepared.
+- **~2 ms wow centre delay is NOT PDC-reported** (`GetLatencySamples()` still returns only the
+  oversampler) — it's a time-varying modulation delay, treated as part of the effect, not fixed latency.
+- **Mono-correlated modulation** (one `mod` for both channels) — a real tape has one transport; a
+  per-channel offset would smear the image and isn't physical here.
+
+**Next up:**
+- By-ear tuning of the M5b endpoints (weights, wow/flutter frequencies, drift LPF, delay span) and the
+  M5 Warmth voicing, alongside the still-open per-effect default tuning (Vibe stagger/`ASYM_K`, Phaser,
+  Flanger).
+- Then the deferred **GUI polish pass**: custom `LookAndFeel`, per-effect panels, LFO visualiser; grey
+  the Mix knob in Vibe's Vibrato mode.
+
+**Open questions / blockers:**
+- Warmth coefficients still update **once per block** (Age is per-sample). Fine at static settings; if
+  faint stepping is audible while *automating* Warmth, move the drive/cutoff recompute per-sample.
+- `drift` is sampled once per block, so its effective input rate is block-rate (then LPF'd to ~2 Hz) —
+  audibly fine, but its texture is very slightly block-size-dependent. Not worth changing unless heard.
+- Unchanged from Session 10: still no `pluginval` / automated DSP test in-repo.
+
+---
+
 ## 2026-07-28 — Session 10: Milestone 5 — Character (tape-warmth) stage
 
 **Done:**

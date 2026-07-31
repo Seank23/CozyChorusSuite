@@ -69,6 +69,7 @@ namespace CozyChorus
 		std::atomic<float>* m_EffectTypeParam = nullptr;
 		std::atomic<float>* m_MixParam = nullptr;
 		std::atomic<float>* m_WarmthParam = nullptr;
+		std::atomic<float>* m_AgeParam = nullptr;
 
 		std::atomic<float>* m_ChorusRateParam = nullptr;
 		std::atomic<float>* m_ChorusDepthParam = nullptr;

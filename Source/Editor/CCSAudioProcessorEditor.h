@@ -27,7 +27,7 @@ namespace CozyChorus
 		juce::AudioProcessorValueTreeState& m_APVTS; // = m_Processor.GetAPVTS()
 
 		juce::ComboBox m_EffectSelector;
-		juce::Slider m_MixSlider, m_WarmthSlider;
+		juce::Slider m_MixSlider, m_WarmthSlider, m_AgeSlider;
 
 		juce::Slider m_ChorusRateSlider, m_ChorusDepthSlider, m_ChorusWidthSlider, m_ChorusVoicesSlider;
 
@@ -40,7 +40,7 @@ namespace CozyChorus
 
 		// Attachments — DECLARED AFTER the components so they destruct FIRST.
 		std::unique_ptr<ComboBoxAttachment> m_EffectAttachment;
-		std::unique_ptr<SliderAttachment> m_MixAtt, m_WarmthAtt;
+		std::unique_ptr<SliderAttachment> m_MixAtt, m_WarmthAtt, m_AgeAtt;
 		std::unique_ptr<SliderAttachment> m_ChorusRateAtt, m_ChorusDepthAtt, m_ChorusWidthAtt, m_ChorusVoicesAtt;
 		std::unique_ptr<SliderAttachment> m_FlangerRateAtt, m_FlangerDepthAtt, m_FlangerWidthAtt, m_FlangerFeedbackAtt, m_FlangerBaseDelayAtt;
 		std::unique_ptr<SliderAttachment> m_PhaserRateAtt, m_PhaserDepthAtt, m_PhaserWidthAtt, m_PhaserStagesAtt, m_PhaserFeedbackAtt;

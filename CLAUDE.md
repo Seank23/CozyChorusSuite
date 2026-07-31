@@ -10,19 +10,23 @@ C++20 / JUCE 8 / CMake.
 
 ## Current status
 
-- **Phase:** Milestone 5 complete — **all four effects plus the global Character (tape-warmth) stage
-  are implemented and audible.** Chorus + Flanger (delay-line family) and Phaser + **Vibe** (all-pass
-  family) finished the DSP-effect track at M4; **M5 adds a global `CharacterStage`** (oversampled
-  asymmetric-tanh saturation + high-cut tone, one **Warmth** macro) applied to the output after the
-  active effect. Only GUI polish (custom `LookAndFeel`, per-effect panels, LFO visualiser) remains — a
-  separate, deferred pass, not a milestone.
+- **Phase:** Milestone 5b complete — **all four effects plus the global Character stage (tape warmth
+  *and* tape age) are implemented and audible.** Chorus + Flanger (delay-line family) and Phaser +
+  **Vibe** (all-pass family) finished the DSP-effect track at M4; **M5 added a global `CharacterStage`**
+  (oversampled asymmetric-tanh saturation + high-cut tone, one **Warmth** macro) applied to the output
+  after the active effect; **M5b adds tape-age wow/flutter** to that same stage — a modulated fractional
+  delay (slow **wow** + fast **flutter** + band-limited random drift) driven by a second **Age** macro,
+  running *before* the saturation. Only GUI polish (custom `LookAndFeel`, per-effect panels, LFO
+  visualiser) remains — a separate, deferred pass, not a milestone.
 - **Params are per-effect (post-M4):** Rate / Depth / Stereo Width were split from shared params into
   **per-effect** APVTS params (`chorusRate`, `flangerRate`, …), so each effect carries its own defaults.
-  **`mix` is the only shared *effect* param**; **`warmth`** is a separate **global stage** param (the
-  Character stage, not an effect control).
+  **`mix` is the only shared *effect* param**; **`warmth`** and **`age`** are separate **global stage**
+  params (the Character stage, not effect controls).
 - **Character stage reports latency (PDC):** the 2× oversampler adds a few samples of latency, reported
   once via `setLatencySamples(m_CharacterStage.GetLatencySamples())` in `prepareToPlay` — the suite's
-  first use of host delay compensation.
+  first use of host delay compensation. The M5b wow/flutter delay line adds a ~2 ms nominal delay that
+  is **deliberately not** PDC-reported (it is a time-varying pitch-modulation delay, part of the effect,
+  not a fixed processing latency).
 - A hand-written **`CCSAudioProcessorEditor`** (rotary knobs + effect selector, per-effect control
   visibility) has replaced the generic editor. Custom `LookAndFeel` / LFO visualiser still deferred.
 - Builds as **VST3 + Standalone** via CMake + JUCE **8.0.14** with the `Visual Studio 18 2026`
@@ -120,8 +124,16 @@ Fixed order (delay-line family first, then all-pass family):
    slope-normalised makeup (unity small-signal gain) for even-harmonic "tape" colour, followed by a
    one-pole **high-cut** (`FirstOrderTPTFilter`). A single **Warmth** macro drives both drive and
    cutoff. Global `warmth` param (default 30 %). Reports oversampler latency via `setLatencySamples`
-   (first PDC use). Wow/flutter + vinyl noise deferred to a later 5b.
-7. **GUI — in progress (functional).** A parameter-driven `CCSAudioProcessorEditor` now ships
+   (first PDC use).
+7. **Milestone 5b — Character (tape age / wow+flutter). ✅ Done.** Adds slow pitch instability to the
+   same `CharacterStage`, **before** the saturation: a modulated fractional delay
+   (`juce::dsp::DelayLine<Lagrange3rd>`, 2 ms centre ±1.5 ms) whose delay is swept by **wow** (0.556 Hz
+   sine), **flutter** (12 Hz sine) and **band-limited random drift** (a per-block `juce::Random` sample
+   through a one-pole ~2 Hz LPF with makeup gain). One shared modulation value across channels
+   (mono-correlated). A single **Age** macro (global `age` param, default 30 %) scales the whole sweep.
+   Wow/flutter only — vinyl/tape *noise* was dropped from scope. Same POD/`SetParameters` shape; an Age
+   knob joins Warmth in the editor (always visible).
+8. **GUI — in progress (functional).** A parameter-driven `CCSAudioProcessorEditor` now ships
    (rotary knobs, effect selector, per-effect control visibility). Still deferred: custom
    `LookAndFeel`, polished per-effect panels, and an LFO visualiser (possibly OpenGL).
 
@@ -189,7 +201,7 @@ Source/
     FlangerEffect.h / .cpp   // Flanger (delay-line family, feedback comb) — Milestone 2, done
     PhaserEffect.h / .cpp    // Phaser (all-pass family, TPT all-pass cascade + feedback) — Milestone 3, done
     VibeEffect.h / .cpp      // Vibe (all-pass family, 4 staggered TPT stages + asymmetric LFO + Chorus/Vibrato mode, no feedback) — Milestone 4, done
-    CharacterStage.h / .cpp  // Character (global tape-warmth stage, NOT a ModulationEffect): 2x oversampled asymmetric-tanh saturation + one-pole high-cut, single Warmth macro — Milestone 5, done
+    CharacterStage.h / .cpp  // Character (global tape stage, NOT a ModulationEffect): M5b wow/flutter fractional-delay pitch modulation (Age macro) → M5 2x oversampled asymmetric-tanh saturation + one-pole high-cut (Warmth macro) — Milestones 5 + 5b, done
 ```
 
 ### Design principle: two DSP families, one shared skeleton
@@ -280,23 +292,47 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
   **2× oversampled** (`juce::dsp::Oversampling`, `filterHalfBandPolyphaseIIR` = minimum-phase, chosen
   for low latency) **asymmetric-tanh saturation** —
   `y = (tanh(drive·(x + DC_BIAS)) − tanh(drive·DC_BIAS)) · invS0`, with `drive = 1 + w·DRIVE_MAX`
-  (`DRIVE_MAX = 4`), `DC_BIAS = 0.15` giving even harmonics, and `invS0 = 1/(drive·(1 − tanh²(drive·DC_BIAS)))`
+  (`DRIVE_MAX = 2.5`), `DC_BIAS = 0.15` giving even harmonics, and `invS0 = 1/(drive·(1 − tanh²(drive·DC_BIAS)))`
   a **slope-normalised makeup** (unity small-signal gain, so Warmth compresses peaks rather than acting
   as a volume knob) — followed by a one-pole **high-cut** (`FirstOrderTPTFilter`, lowpass) swept
-  `fc = MAX_WARMTH_CUTOFF_HZ·(MIN/MAX)^w` from **18 kHz → 6.5 kHz**. One **Warmth** macro (0–1) drives
+  `fc = MAX_WARMTH_CUTOFF_HZ·(MIN/MAX)^w` from **18 kHz → 4 kHz**. One **Warmth** macro (0–1) drives
   both drive and cutoff; `warmth` is smoothed 20 ms but read **once per block** (coefficients constant
   per block). All state (oversampler, filter) allocated in `Prepare`; `Process` is allocation-free
   (`processSamplesUp`/`Down` reuse the oversampler's internal buffers). **Latency:** the oversampler's
   IIR adds a few samples, reported once via `setLatencySamples(m_CharacterStage.GetLatencySamples())`
   in `prepareToPlay` (the suite's first PDC). **`warmth` is a global stage param** (default 30 %), not
-  an effect control and independent of `effectType`. Wow/flutter + vinyl noise are deferred to a later
-  **5b**. Drive/bias/cutoff endpoints are **tuned by ear**.
+  an effect control and independent of `effectType`. (`DRIVE_MAX`/cutoff endpoints were retuned by ear
+  during M5b — was 4 / 6.5 kHz at M5.) Drive/bias/cutoff endpoints are **tuned by ear**.
   - **Editor:** a **Warmth** rotary knob, always visible (like Mix, independent of `effectType`), added
     right after the Mix knob in `GetAllComponents()`; caption "Warmth".
   - **Shipped-M5 fix:** the saturation loop originally iterated the *pre*-oversampling sample/channel
     counts (`< numSamples - 1`, `< numChannels - 1`), leaving the back half of every 2× block
     unsaturated → a per-block discontinuity heard as low-frequency crackle, and skipping the last
     channel. Fixed to iterate the oversampled block's own `getNumSamples()`/`getNumChannels()`.
+- **Character tape-age / wow+flutter (M5b):** the same `CharacterStage` gained a pitch-instability stage
+  that runs **first in `Process`, before the oversampled saturation**, sharing the stage's `Prepare/
+  Process/Reset` + POD-`SetParameters` shape. DSP: a modulated fractional delay
+  (`juce::dsp::DelayLine<Lagrange3rd>`, max `(CENTER+HALF_SPAN)` ms + 4 headroom samples) whose delay is
+  `(CENTER_DELAY_MS + HALF_SPAN_DELAY_MS·mod·age)·0.001·fs` with `CENTER = 2 ms`, `HALF_SPAN = 1.5 ms`.
+  `mod = WOW_WEIGHT·wowSine + FLUTTER_WEIGHT·flutterSine + NOISE_WEIGHT·driftMakeup` (weights
+  `0.8 / 0.04 / 0.02`) — two `LFO` instances (`WOW_FREQUENCY = 0.556 Hz`, `FLUTTER_FREQUENCY = 12 Hz`,
+  advanced once per sample) plus **band-limited random drift**: one `juce::Random` sample **per block**,
+  bipolar, run through a one-pole LPF (`NOISE_LPF_HZ = 2 Hz`, coeff precomputed in `Prepare`) with a
+  `1/√(coeff/2)` **makeup gain** to restore amplitude after the heavy lowpass. **One shared `mod`/delay
+  across channels** (mono-correlated, physically correct for one transport). A single **Age** macro
+  (global `age` param, default 30 %, smoothed 20 ms, read **per sample**) scales `mod`, so Age 0 % ⇒ a
+  static 2 ms delay (inaudible) and 100 % ⇒ full wander. **No feedback.** State (delay line, LFOs,
+  noise) allocated/prepared in `Prepare`; `Reset` flushes all of it. The ~2 ms centre delay is
+  **not** PDC-reported (`GetLatencySamples()` still returns only the oversampler) — it's a time-varying
+  modulation delay, treated as part of the effect. Flutter carries a deliberately **much smaller weight**
+  than wow (equal weight would make 12 Hz swing pitch ~20× harder than 0.556 Hz → seasick). Scope was
+  **wow/flutter only** — vinyl/tape *noise* was dropped. Weights/frequencies/span are **tuned by ear**.
+  - **Fix during M5b:** `SetParameters` initially set only `m_Warmth` and never `m_Age`, so `m_Age`
+    stayed pinned at 0 and Age was inaudible across its whole range; adding `m_Age.setTargetValue(...)`
+    fixed it. The raw per-sample random was also replaced by the band-limited-drift path above (raw
+    white noise gargled).
+  - **Editor:** an **Age** rotary knob, always visible (like Warmth), added right after Warmth in
+    `GetAllComponents()`; caption "Age".
 
 ---
 
@@ -426,29 +462,44 @@ shown only for the Vibe (5 controls: 4 knobs — its Rate/Depth/Width + the shar
 and `ASYM_K` are **tuned by ear, not measured** — a by-ear polish pass against reference Uni-Vibe
 material is still open.
 
-### Character (Milestone 5 — global tape-warmth stage, not an effect)
+### Character (Milestones 5 + 5b — global tape stage, not an effect)
 
-- Runs on the output **after** the active effect (post-Mix), not selected by `effectType`. Signal path:
-  `input → 2× upsample → asymmetric-tanh saturation → downsample → one-pole high-cut → output`.
+- Runs on the output **after** the active effect (post-Mix), not selected by `effectType`. Full signal
+  path: `input → wow/flutter fractional delay (M5b) → 2× upsample → asymmetric-tanh saturation →
+  downsample → one-pole high-cut → output`.
+- **Wow/flutter (M5b, runs first):** a modulated fractional delay (`juce::dsp::DelayLine<Lagrange3rd>`)
+  whose delay is `(2 ms + 1.5 ms·mod·Age)`, where
+  `mod = 0.8·wow(0.556 Hz) + 0.04·flutter(12 Hz) + 0.02·drift`. Wow/flutter are two `LFO` sines
+  (advanced per sample); `drift` is one `juce::Random` value per block, bipolar, one-pole-LPF'd at 2 Hz
+  with `1/√(coeff/2)` makeup. One shared `mod`/delay across channels (mono-correlated). Age 0 % ⇒ static
+  2 ms delay (silent); 100 % ⇒ full wander. No feedback.
 - **Saturation:** `y = (tanh(drive·(x + BIAS)) − tanh(drive·BIAS)) · invS0` at 2× oversampling
-  (`juce::dsp::Oversampling`, minimum-phase half-band IIR for low latency). `drive = 1 + Warmth·4`;
+  (`juce::dsp::Oversampling`, minimum-phase half-band IIR for low latency). `drive = 1 + Warmth·2.5`;
   `BIAS = 0.15` shifts the operating point off-centre for **even-harmonic** colour; the `− tanh(drive·BIAS)`
   term re-centres DC; `invS0 = 1/(drive·(1 − tanh²(drive·BIAS)))` normalises the **slope at 0** so
   small signals pass at unity gain (built-in makeup — Warmth compresses peaks, it is *not* a volume knob).
 - **Tone:** one-pole **high-cut** (`FirstOrderTPTFilter`, lowpass) after downsampling, swept by the same
-  macro `fc = 18 kHz·(6.5/18)^Warmth` → 18 kHz at 0 %, 6.5 kHz at 100 %.
-- **Latency:** the oversampler adds a few samples; reported via `setLatencySamples` (PDC).
+  macro `fc = 18 kHz·(4/18)^Warmth` → 18 kHz at 0 %, 4 kHz at 100 %.
+- **Latency:** the oversampler adds a few samples; reported via `setLatencySamples` (PDC). The M5b
+  wow/flutter delay (~2 ms) is **not** PDC-reported (time-varying modulation delay, part of the effect).
 
 | Param | Range | Notes |
 |---|---|---|
 | Warmth | 0–100% | **global** macro (default 30 %); drives saturation amount **and** high-cut together |
+| Age | 0–100% | **global** macro (default 30 %); scales wow/flutter pitch-modulation depth (0 % = off) |
 
 **Shipped M5:** functionally correct and RT-safe — oversampler + filter allocated in `Prepare`,
 `Process` allocation-free, Warmth smoothed 20 ms (read once per block). One post-ship fix: the
 saturation loop was iterating the pre-oversampling sample/channel counts, leaving half of every 2×
 block unsaturated (low-frequency crackle) and skipping the last channel — corrected to iterate the
 oversampled block's own extents. Endpoints (`DRIVE_MAX`, `BIAS`, cutoff range) are **tuned by ear**.
-Wow/flutter + vinyl noise deferred to a later **5b**.
+
+**Shipped M5b:** wow/flutter only (vinyl/tape *noise* dropped from scope). RT-safe — delay line, LFOs
+and noise-LPF coefficient all set up in `Prepare`, `Process` allocation-free, Age smoothed 20 ms (read
+per sample). One fix: `SetParameters` initially never called `m_Age.setTargetValue`, pinning Age at 0
+(inaudible across its range); and the raw per-sample random was replaced by the band-limited-drift path
+(raw white noise gargled). Weights (`0.8 / 0.04 / 0.02`), frequencies (0.556 / 12 Hz), the 2 Hz drift
+LPF, and the 2 ms ± 1.5 ms delay span are **tuned by ear**; a by-ear polish pass is still open.
 
 ---
 

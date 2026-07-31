@@ -32,6 +32,9 @@ namespace CozyChorus
 		addAndMakeVisible(m_WarmthSlider);
 		m_WarmthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
 		m_WarmthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		addAndMakeVisible(m_AgeSlider);
+		m_AgeSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+		m_AgeSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
 
 		addAndMakeVisible(m_ChorusRateSlider);
 		m_ChorusRateSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
@@ -93,6 +96,7 @@ namespace CozyChorus
 		m_EffectAttachment = std::make_unique<ComboBoxAttachment>(m_APVTS, ParameterIDs::EffectType, m_EffectSelector);
 		m_MixAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Mix, m_MixSlider);
 		m_WarmthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Warmth, m_WarmthSlider);
+		m_AgeAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Age, m_AgeSlider);
 
 		m_ChorusRateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusRate, m_ChorusRateSlider);
 		m_ChorusDepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusDepth, m_ChorusDepthSlider);
@@ -146,6 +150,7 @@ namespace CozyChorus
 		{
 			if (comp == &m_MixSlider) return "Mix";
 			if (comp == &m_WarmthSlider) return "Warmth";
+			if (comp == &m_AgeSlider) return "Age";
 
 			if (comp == &m_ChorusRateSlider) return "Rate";
 			if (comp == &m_ChorusDepthSlider) return "Depth";
@@ -203,6 +208,7 @@ namespace CozyChorus
 
 		m_MixSlider.setVisible(true);
 		m_WarmthSlider.setVisible(true);
+		m_AgeSlider.setVisible(true);
 
 		m_ChorusRateSlider.setVisible(type == EffectType::Chorus);
 		m_ChorusDepthSlider.setVisible(type == EffectType::Chorus);
@@ -273,6 +279,6 @@ namespace CozyChorus
 
 	std::vector<juce::Component*> CCSAudioProcessorEditor::GetAllComponents()
 	{
-		return { &m_MixSlider, &m_WarmthSlider, &m_ChorusRateSlider, &m_ChorusDepthSlider, &m_ChorusWidthSlider, &m_ChorusVoicesSlider, &m_FlangerRateSlider, &m_FlangerDepthSlider, &m_FlangerWidthSlider, &m_FlangerFeedbackSlider, &m_FlangerBaseDelaySlider, &m_PhaserRateSlider, &m_PhaserDepthSlider, &m_PhaserWidthSlider, &m_PhaserStagesSlider, &m_PhaserFeedbackSlider, &m_VibeRateSlider, &m_VibeDepthSlider, &m_VibeWidthSlider, &m_VibeModeButton };
+		return { &m_MixSlider, &m_WarmthSlider, &m_AgeSlider, &m_ChorusRateSlider, &m_ChorusDepthSlider, &m_ChorusWidthSlider, &m_ChorusVoicesSlider, &m_FlangerRateSlider, &m_FlangerDepthSlider, &m_FlangerWidthSlider, &m_FlangerFeedbackSlider, &m_FlangerBaseDelaySlider, &m_PhaserRateSlider, &m_PhaserDepthSlider, &m_PhaserWidthSlider, &m_PhaserStagesSlider, &m_PhaserFeedbackSlider, &m_VibeRateSlider, &m_VibeDepthSlider, &m_VibeWidthSlider, &m_VibeModeButton };
 	}
 }

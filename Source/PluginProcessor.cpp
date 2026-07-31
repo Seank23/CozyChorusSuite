@@ -12,6 +12,7 @@ namespace CozyChorus
 		m_EffectTypeParam = m_APVTS.getRawParameterValue(ParameterIDs::EffectType);
 		m_MixParam = m_APVTS.getRawParameterValue(ParameterIDs::Mix);
 		m_WarmthParam = m_APVTS.getRawParameterValue(ParameterIDs::Warmth);
+		m_AgeParam = m_APVTS.getRawParameterValue(ParameterIDs::Age);
 
 		m_ChorusRateParam = m_APVTS.getRawParameterValue(ParameterIDs::ChorusRate);
 		m_ChorusDepthParam = m_APVTS.getRawParameterValue(ParameterIDs::ChorusDepth);
@@ -164,6 +165,7 @@ namespace CozyChorus
 
 		CharacterStageParameters charParams{};
 		charParams.Warmth = std::clamp(m_WarmthParam->load() / 100.0f, 0.0f, 1.0f);
+		charParams.Age = std::clamp(m_AgeParam->load() / 100.0f, 0.0f, 1.0f);
 		m_CharacterStage.SetParameters(charParams);
 		m_CharacterStage.Process(context);
 	}
