@@ -1,5 +1,8 @@
 #pragma once
 #include "../PluginProcessor.h"
+#include "CCSLookAndFeel.h"
+#include "LabeledKnob.h"
+
 #include <juce_audio_processors/juce_audio_processors.h>
 
 namespace CozyChorus
@@ -15,9 +18,11 @@ namespace CozyChorus
 
 	private:
 		void timerCallback() override;
-		void UpdateVisibility();
+		void HideAllEffectComponents();
 		void RenderComponents();
-		std::vector<juce::Component*> GetAllComponents();
+		std::vector<juce::Component*> GetActiveComponents();
+
+		CCSLookAndFeel m_LookAndFeel;
 
 		using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
 		using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
@@ -27,15 +32,15 @@ namespace CozyChorus
 		juce::AudioProcessorValueTreeState& m_APVTS; // = m_Processor.GetAPVTS()
 
 		juce::ComboBox m_EffectSelector;
-		juce::Slider m_MixSlider, m_WarmthSlider, m_AgeSlider;
+		std::unique_ptr<LabeledKnob> m_MixKnob, m_WarmthKnob, m_AgeKnob;
 
-		juce::Slider m_ChorusRateSlider, m_ChorusDepthSlider, m_ChorusWidthSlider, m_ChorusVoicesSlider;
+		std::unique_ptr<LabeledKnob> m_ChorusRateKnob, m_ChorusDepthKnob, m_ChorusWidthKnob, m_ChorusVoicesKnob;
 
-		juce::Slider m_FlangerRateSlider, m_FlangerDepthSlider, m_FlangerWidthSlider, m_FlangerFeedbackSlider, m_FlangerBaseDelaySlider;
+		std::unique_ptr<LabeledKnob> m_FlangerRateKnob, m_FlangerDepthKnob, m_FlangerWidthKnob, m_FlangerFeedbackKnob, m_FlangerBaseDelayKnob;
 
-		juce::Slider m_PhaserRateSlider, m_PhaserDepthSlider, m_PhaserWidthSlider, m_PhaserStagesSlider, m_PhaserFeedbackSlider;
+		std::unique_ptr<LabeledKnob> m_PhaserRateKnob, m_PhaserDepthKnob, m_PhaserWidthKnob, m_PhaserStagesKnob, m_PhaserFeedbackKnob;
 
-		juce::Slider m_VibeRateSlider, m_VibeDepthSlider, m_VibeWidthSlider;
+		std::unique_ptr<LabeledKnob> m_VibeRateKnob, m_VibeDepthKnob, m_VibeWidthKnob;
 		juce::ToggleButton m_VibeModeButton;
 
 		// Attachments — DECLARED AFTER the components so they destruct FIRST.
@@ -46,6 +51,9 @@ namespace CozyChorus
 		std::unique_ptr<SliderAttachment> m_PhaserRateAtt, m_PhaserDepthAtt, m_PhaserWidthAtt, m_PhaserStagesAtt, m_PhaserFeedbackAtt;
 		std::unique_ptr<SliderAttachment> m_VibeRateAtt, m_VibeDepthAtt, m_VibeWidthAtt;
 		std::unique_ptr<ButtonAttachment> m_VibeModeAtt;
+
+		juce::Rectangle<int> m_CharacterZone;
+		juce::Rectangle<int> m_ScreenZone;
 
 		int m_LastEffectIndex = -1;
 

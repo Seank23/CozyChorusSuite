@@ -1,190 +1,136 @@
 #include "CCSAudioProcessorEditor.h"
+#include "EditorConstants.h"
 
 namespace CozyChorus
 {
-	namespace
-	{
-		// Layout metrics shared by resized() (positions the controls) and paint()
-		// (draws the title/caption bands that resized() reserves). Keep them in sync.
-		constexpr int kMargin = 12;
-		constexpr int kTitleHeight = 26;
-		constexpr int kSelectorHeight = 24;
-		constexpr int kGap = 10;
-		constexpr int kCaptionHeight = 16;
-		constexpr int kCellPadX = 6;
-		constexpr int kCellPadY = 4;
-		constexpr int kMaxColumns = 4;
-
-		// Cozy, warm palette.
-		const juce::Colour kBackground{ 0xff2a2320 };
-		const juce::Colour kTitleText{ 0xfff2e6d0 };
-		const juce::Colour kCaptionText{ 0xffcbb89a };
-	}
-
 	CCSAudioProcessorEditor::CCSAudioProcessorEditor(juce::AudioProcessor& processor)
 		: juce::AudioProcessorEditor(processor), m_Processor(static_cast<PluginProcessor&>(processor)), m_APVTS(m_Processor.GetAPVTS())
 	{
+		setLookAndFeel(&m_LookAndFeel);
 		addAndMakeVisible(m_EffectSelector);
 		m_EffectSelector.addItemList(GetEffectTypeChoices(), 1);
-		addAndMakeVisible(m_MixSlider);
-		m_MixSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_MixSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_WarmthSlider);
-		m_WarmthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_WarmthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_AgeSlider);
-		m_AgeSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_AgeSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
 
-		addAndMakeVisible(m_ChorusRateSlider);
-		m_ChorusRateSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_ChorusRateSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_ChorusDepthSlider);
-		m_ChorusDepthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_ChorusDepthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_ChorusWidthSlider);
-		m_ChorusWidthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_ChorusWidthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_ChorusVoicesSlider);
-		m_ChorusVoicesSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_ChorusVoicesSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		m_MixKnob = std::make_unique<LabeledKnob>("Mix");
+		addAndMakeVisible(m_MixKnob.get());
+		m_AgeKnob = std::make_unique<LabeledKnob>("Age");
+		addAndMakeVisible(m_AgeKnob.get());
+		m_WarmthKnob = std::make_unique<LabeledKnob>("Warmth");
+		addAndMakeVisible(m_WarmthKnob.get());
 
-		addAndMakeVisible(m_FlangerRateSlider);
-		m_FlangerRateSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_FlangerRateSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_FlangerDepthSlider);
-		m_FlangerDepthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_FlangerDepthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_FlangerWidthSlider);
-		m_FlangerWidthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_FlangerWidthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_FlangerFeedbackSlider);
-		m_FlangerFeedbackSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_FlangerFeedbackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_FlangerBaseDelaySlider);
-		m_FlangerBaseDelaySlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_FlangerBaseDelaySlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		m_ChorusRateKnob = std::make_unique<LabeledKnob>("Rate");
+		addAndMakeVisible(m_ChorusRateKnob.get());
+		m_ChorusDepthKnob = std::make_unique<LabeledKnob>("Depth");
+		addAndMakeVisible(m_ChorusDepthKnob.get());
+		m_ChorusWidthKnob = std::make_unique<LabeledKnob>("Width");
+		addAndMakeVisible(m_ChorusWidthKnob.get());
+		m_ChorusVoicesKnob = std::make_unique<LabeledKnob>("Voices");
+		addAndMakeVisible(m_ChorusVoicesKnob.get());
 
-		addAndMakeVisible(m_PhaserRateSlider);
-		m_PhaserRateSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_PhaserRateSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_PhaserDepthSlider);
-		m_PhaserDepthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_PhaserDepthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_PhaserWidthSlider);
-		m_PhaserWidthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_PhaserWidthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_PhaserStagesSlider);
-		m_PhaserStagesSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_PhaserStagesSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_PhaserFeedbackSlider);
-		m_PhaserFeedbackSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_PhaserFeedbackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		m_FlangerRateKnob = std::make_unique<LabeledKnob>("Rate");
+		addAndMakeVisible(m_FlangerRateKnob.get());
+		m_FlangerDepthKnob = std::make_unique<LabeledKnob>("Depth");
+		addAndMakeVisible(m_FlangerDepthKnob.get());
+		m_FlangerWidthKnob = std::make_unique<LabeledKnob>("Width");
+		addAndMakeVisible(m_FlangerWidthKnob.get());
+		m_FlangerFeedbackKnob = std::make_unique<LabeledKnob>("Feedback");
+		addAndMakeVisible(m_FlangerFeedbackKnob.get());
+		m_FlangerBaseDelayKnob = std::make_unique<LabeledKnob>("Base Delay");
+		addAndMakeVisible(m_FlangerBaseDelayKnob.get());
 
-		addAndMakeVisible(m_VibeRateSlider);
-		m_VibeRateSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_VibeRateSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_VibeDepthSlider);
-		m_VibeDepthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_VibeDepthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-		addAndMakeVisible(m_VibeWidthSlider);
-		m_VibeWidthSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-		m_VibeWidthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+		m_PhaserRateKnob = std::make_unique<LabeledKnob>("Rate");
+		addAndMakeVisible(m_PhaserRateKnob.get());
+		m_PhaserDepthKnob = std::make_unique<LabeledKnob>("Depth");
+		addAndMakeVisible(m_PhaserDepthKnob.get());
+		m_PhaserWidthKnob = std::make_unique<LabeledKnob>("Width");
+		addAndMakeVisible(m_PhaserWidthKnob.get());
+		m_PhaserStagesKnob = std::make_unique<LabeledKnob>("Stages");
+		addAndMakeVisible(m_PhaserStagesKnob.get());
+		m_PhaserFeedbackKnob = std::make_unique<LabeledKnob>("Feedback");
+		addAndMakeVisible(m_PhaserFeedbackKnob.get());
+
+		m_VibeRateKnob = std::make_unique<LabeledKnob>("Rate");
+		addAndMakeVisible(m_VibeRateKnob.get());
+		m_VibeDepthKnob = std::make_unique<LabeledKnob>("Depth");
+		addAndMakeVisible(m_VibeDepthKnob.get());
+		m_VibeWidthKnob = std::make_unique<LabeledKnob>("Width");
+		addAndMakeVisible(m_VibeWidthKnob.get());
+
 		addAndMakeVisible(m_VibeModeButton);
 		m_VibeModeButton.setButtonText("Vibrato");
 
 		m_EffectAttachment = std::make_unique<ComboBoxAttachment>(m_APVTS, ParameterIDs::EffectType, m_EffectSelector);
-		m_MixAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Mix, m_MixSlider);
-		m_WarmthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Warmth, m_WarmthSlider);
-		m_AgeAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Age, m_AgeSlider);
+		m_MixAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Mix, m_MixKnob->getSlider());
+		m_WarmthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Warmth, m_WarmthKnob->getSlider());
+		m_AgeAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::Age, m_AgeKnob->getSlider());
 
-		m_ChorusRateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusRate, m_ChorusRateSlider);
-		m_ChorusDepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusDepth, m_ChorusDepthSlider);
-		m_ChorusWidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusWidth, m_ChorusWidthSlider);
-		m_ChorusVoicesAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusVoices, m_ChorusVoicesSlider);
+		m_ChorusRateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusRate, m_ChorusRateKnob->getSlider());
+		m_ChorusDepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusDepth, m_ChorusDepthKnob->getSlider());
+		m_ChorusWidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusWidth, m_ChorusWidthKnob->getSlider());
+		m_ChorusVoicesAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::ChorusVoices, m_ChorusVoicesKnob->getSlider());
 
-		m_FlangerRateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerRate, m_FlangerRateSlider);
-		m_FlangerDepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerDepth, m_FlangerDepthSlider);
-		m_FlangerWidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerWidth, m_FlangerWidthSlider);
-		m_FlangerFeedbackAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerFeedback, m_FlangerFeedbackSlider);
-		m_FlangerBaseDelayAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerBaseDelay, m_FlangerBaseDelaySlider);
+		m_FlangerRateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerRate, m_FlangerRateKnob->getSlider());
+		m_FlangerDepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerDepth, m_FlangerDepthKnob->getSlider());
+		m_FlangerWidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerWidth, m_FlangerWidthKnob->getSlider());
+		m_FlangerFeedbackAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerFeedback, m_FlangerFeedbackKnob->getSlider());
+		m_FlangerBaseDelayAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::FlangerBaseDelay, m_FlangerBaseDelayKnob->getSlider());
 
-		m_PhaserRateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserRate, m_PhaserRateSlider);
-		m_PhaserDepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserDepth, m_PhaserDepthSlider);
-		m_PhaserWidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserWidth, m_PhaserWidthSlider);
-		m_PhaserStagesAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserStages, m_PhaserStagesSlider);
-		m_PhaserFeedbackAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserFeedback, m_PhaserFeedbackSlider);
+		m_PhaserRateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserRate, m_PhaserRateKnob->getSlider());
+		m_PhaserDepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserDepth, m_PhaserDepthKnob->getSlider());
+		m_PhaserWidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserWidth, m_PhaserWidthKnob->getSlider());
+		m_PhaserStagesAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserStages, m_PhaserStagesKnob->getSlider());
+		m_PhaserFeedbackAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::PhaserFeedback, m_PhaserFeedbackKnob->getSlider());
 
-		m_VibeRateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::VibeRate, m_VibeRateSlider);
-		m_VibeDepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::VibeDepth, m_VibeDepthSlider);
-		m_VibeWidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::VibeWidth, m_VibeWidthSlider);
+		m_VibeRateAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::VibeRate, m_VibeRateKnob->getSlider());
+		m_VibeDepthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::VibeDepth, m_VibeDepthKnob->getSlider());
+		m_VibeWidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::VibeWidth, m_VibeWidthKnob->getSlider());
 		m_VibeModeAtt = std::make_unique<ButtonAttachment>(m_APVTS, ParameterIDs::VibeMode, m_VibeModeButton);
 
 		startTimerHz(30);
-		UpdateVisibility();
-		setSize(400, 300);
+		setSize(560, 440);
 	}
 
 	CCSAudioProcessorEditor::~CCSAudioProcessorEditor()
 	{
+		setLookAndFeel(nullptr);
 	}
 
 	void CCSAudioProcessorEditor::paint(juce::Graphics& graphics)
 	{
-		graphics.fillAll(kBackground);
+		graphics.fillAll(Palette::Background);
 
+		// Main panel
 		auto bounds = getLocalBounds().reduced(kMargin);
+		graphics.setColour(Palette::Plate);
+		graphics.fillRoundedRectangle(bounds.toFloat(), kCornerRadius);
 
-		// Title band (resized() reserves the same strip at the top).
-		graphics.setColour(kTitleText);
+		// Border
+		graphics.setColour(Palette::TitleText.withAlpha(0.06f));
+		graphics.drawRoundedRectangle(bounds.toFloat().reduced(1.0f), kCornerRadius, 1.0f);
+
+		// Brand plate
+		auto plateBounds = getLocalBounds().reduced(kMargin).removeFromTop(kHeaderHeight);
+		graphics.setColour(Palette::KnobBody);
+		graphics.fillRoundedRectangle(plateBounds.toFloat(), kCornerRadiusSmall);
+		graphics.setColour(Palette::TitleText);
 		graphics.setFont(juce::Font(juce::FontOptions(18.0f, juce::Font::bold)));
-		graphics.drawText("CozyChorus Suite", bounds.removeFromTop(kTitleHeight), juce::Justification::centredLeft);
+		graphics.drawText("CozyChorus Suite", plateBounds.reduced(kGap), juce::Justification::centredLeft);
 
-		// A caption above each visible slider, drawn into the band resized() left
-		// empty above the control. Reading each slider's laid-out bounds keeps the
-		// captions aligned with whatever grid resized() produced for this effect.
-		graphics.setFont(juce::Font(juce::FontOptions(13.0f)));
-		graphics.setColour(kCaptionText);
+		// Character plate
+		auto characterBounds = m_CharacterZone.reduced(kGap);
+		graphics.setColour(Palette::Track);
+		graphics.drawRoundedRectangle(characterBounds.toFloat(), kCornerRadiusSmall, 1.5f);
+		graphics.setColour(Palette::CaptionText);
+		graphics.setFont(juce::Font(juce::FontOptions(12.0f)));
+		auto captionBounds = characterBounds.removeFromTop(kCaptionHeight);
+		graphics.drawText("Character", captionBounds, juce::Justification::centred);
 
-		const auto captionFor = [this](const juce::Component* comp) -> juce::String
-		{
-			if (comp == &m_MixSlider) return "Mix";
-			if (comp == &m_WarmthSlider) return "Warmth";
-			if (comp == &m_AgeSlider) return "Age";
-
-			if (comp == &m_ChorusRateSlider) return "Rate";
-			if (comp == &m_ChorusDepthSlider) return "Depth";
-			if (comp == &m_ChorusWidthSlider) return "Width";
-			if (comp == &m_ChorusVoicesSlider) return "Voices";
-
-			if (comp == &m_FlangerRateSlider) return "Rate";
-			if (comp == &m_FlangerDepthSlider) return "Depth";
-			if (comp == &m_FlangerWidthSlider) return "Width";
-			if (comp == &m_FlangerFeedbackSlider)  return "Feedback";
-			if (comp == &m_FlangerBaseDelaySlider) return "Base Delay";
-
-			if (comp == &m_PhaserRateSlider) return "Rate";
-			if (comp == &m_PhaserDepthSlider) return "Depth";
-			if (comp == &m_PhaserWidthSlider) return "Width";
-			if (comp == &m_PhaserStagesSlider) return "Stages";
-			if (comp == &m_PhaserFeedbackSlider) return "Feedback";
-
-			if (comp == &m_VibeRateSlider) return "Rate";
-			if (comp == &m_VibeDepthSlider) return "Depth";
-			if (comp == &m_VibeWidthSlider) return "Width";
-			if (comp == &m_VibeModeButton) return "Vibrato";
-			return {};
-		};
-
-		for (auto* comp : GetAllComponents())
-		{
-			if (!comp->isVisible())
-				continue;
-
-			const auto compBounds = comp->getBounds();
-			const juce::Rectangle<int> caption(compBounds.getX(), compBounds.getY() - kCaptionHeight, compBounds.getWidth(), kCaptionHeight);
-			graphics.drawText(captionFor(comp), caption, juce::Justification::centred);
-		}
+		// Screen
+		graphics.setColour(Palette::Screen);
+		graphics.fillRoundedRectangle(m_ScreenZone.toFloat(), kCornerRadiusSmall);
+		graphics.setColour(juce::Colours::black.withAlpha(0.25f));
+		graphics.drawRoundedRectangle(m_ScreenZone.toFloat().reduced(1.0f), kCornerRadiusSmall, 1.0f);
+		graphics.setColour(Palette::CaptionText.withAlpha(0.5f));
+		graphics.drawText("Screen", m_ScreenZone.removeFromTop(kCaptionHeight), juce::Justification::centred);
 	}
 
 	void CCSAudioProcessorEditor::resized()
@@ -196,89 +142,82 @@ namespace CozyChorus
 	{
 		const int idx = (int)m_APVTS.getRawParameterValue(ParameterIDs::EffectType)->load();
 		if (idx != m_LastEffectIndex)
-		{
 			m_LastEffectIndex = idx;
-			UpdateVisibility();
-		}
+
+		const bool isMixDead = m_LastEffectIndex == static_cast<int>(EffectType::Vibe) && m_APVTS.getRawParameterValue(ParameterIDs::VibeMode)->load() >= 0.5f;
+		m_MixKnob->getSlider().setEnabled(!isMixDead);
+		RenderComponents();
 	}
 
-	void CCSAudioProcessorEditor::UpdateVisibility()
+	void CCSAudioProcessorEditor::HideAllEffectComponents()
 	{
-		const auto type = static_cast<EffectType>(m_LastEffectIndex);
-
-		m_MixSlider.setVisible(true);
-		m_WarmthSlider.setVisible(true);
-		m_AgeSlider.setVisible(true);
-
-		m_ChorusRateSlider.setVisible(type == EffectType::Chorus);
-		m_ChorusDepthSlider.setVisible(type == EffectType::Chorus);
-		m_ChorusWidthSlider.setVisible(type == EffectType::Chorus);
-		m_ChorusVoicesSlider.setVisible(type == EffectType::Chorus);
-
-		m_FlangerRateSlider.setVisible(type == EffectType::Flanger);
-		m_FlangerDepthSlider.setVisible(type == EffectType::Flanger);
-		m_FlangerWidthSlider.setVisible(type == EffectType::Flanger);
-		m_FlangerFeedbackSlider.setVisible(type == EffectType::Flanger);
-		m_FlangerBaseDelaySlider.setVisible(type == EffectType::Flanger);
-
-		m_PhaserRateSlider.setVisible(type == EffectType::Phaser);
-		m_PhaserDepthSlider.setVisible(type == EffectType::Phaser);
-		m_PhaserWidthSlider.setVisible(type == EffectType::Phaser);
-		m_PhaserStagesSlider.setVisible(type == EffectType::Phaser);
-		m_PhaserFeedbackSlider.setVisible(type == EffectType::Phaser);
-
-		m_VibeRateSlider.setVisible(type == EffectType::Vibe);
-		m_VibeDepthSlider.setVisible(type == EffectType::Vibe);
-		m_VibeWidthSlider.setVisible(type == EffectType::Vibe);
-		m_VibeModeButton.setVisible(type == EffectType::Vibe);
-
-		RenderComponents();
+		m_ChorusDepthKnob->setVisible(false);
+		m_ChorusRateKnob->setVisible(false);
+		m_ChorusWidthKnob->setVisible(false);
+		m_ChorusVoicesKnob->setVisible(false);
+		m_FlangerDepthKnob->setVisible(false);
+		m_FlangerRateKnob->setVisible(false);
+		m_FlangerWidthKnob->setVisible(false);
+		m_FlangerFeedbackKnob->setVisible(false);
+		m_FlangerBaseDelayKnob->setVisible(false);
+		m_PhaserDepthKnob->setVisible(false);
+		m_PhaserRateKnob->setVisible(false);
+		m_PhaserWidthKnob->setVisible(false);
+		m_PhaserStagesKnob->setVisible(false);
+		m_PhaserFeedbackKnob->setVisible(false);
+		m_VibeDepthKnob->setVisible(false);
+		m_VibeRateKnob->setVisible(false);
+		m_VibeWidthKnob->setVisible(false);
+		m_VibeModeButton.setVisible(false);
 	}
 
 	void CCSAudioProcessorEditor::RenderComponents()
 	{
 		auto area = getLocalBounds().reduced(kMargin);
-
-		area.removeFromTop(kTitleHeight); // title band, painted in paint()
-
-		m_EffectSelector.setBounds(area.removeFromTop(kSelectorHeight));
+		auto header = area.removeFromTop(kHeaderHeight);
 		area.removeFromTop(kGap);
+		auto bottomRow = area.removeFromBottom(kBottomRowHeight);
+		area.removeFromBottom(kGap);
+		auto mixZone = area.removeFromLeft(kMixZoneWidth);
+		m_CharacterZone = area.removeFromRight(kCharacterZoneWidth);
+		m_ScreenZone = area; // remaining space in the middle
 
-		// Only the controls visible for the active effect take part in the grid, in a
-		// fixed left-to-right order, wrapping after kMaxColumns.
-		juce::Array<juce::Component*> visible;
-		for (auto* slider : GetAllComponents())
+		m_EffectSelector.setBounds(header.reduced(kGap).removeFromRight(kSelectorWidth));
+		m_MixKnob->setBounds(mixZone.withSizeKeepingCentre(kKnobWidth, kKnobHeight));
+		auto characterKnobs = m_CharacterZone.reduced(10.0f);
+		auto warmthCell = characterKnobs.removeFromLeft(characterKnobs.getWidth() / 2.0f);
+		auto ageCell = characterKnobs;
+		m_WarmthKnob->setBounds(warmthCell.withSizeKeepingCentre(kKnobWidth, kKnobHeight));
+		m_AgeKnob->setBounds(ageCell.withSizeKeepingCentre(kKnobWidth, kKnobHeight));
+
+		HideAllEffectComponents();
+		auto activeComponents = GetActiveComponents();
+		size_t n = activeComponents.size();
+		float totalWidth = (n * kKnobWidth) + ((n - 1) * kGap);
+		float x = bottomRow.getCentreX() - (totalWidth / 2.0f);
+		for (auto* comp : activeComponents)
 		{
-			if (slider->isVisible())
-				visible.add(slider);
+			comp->setBounds(x, bottomRow.getY(), kKnobWidth, kKnobHeight);
+			comp->setVisible(true);
+			x += kKnobWidth + kGap;
 		}
-
-		if (visible.isEmpty())
-			return;
-
-		const int columns = juce::jmin(kMaxColumns, visible.size());
-		const int rows = (visible.size() + columns - 1) / columns;
-
-		const int cellWidth = area.getWidth() / columns;
-		const int cellHeight = area.getHeight() / rows;
-
-		for (int i = 0; i < visible.size(); ++i)
-		{
-			const int column = i % columns;
-			const int row = i / columns;
-
-			juce::Rectangle<int> cell(area.getX() + column * cellWidth, area.getY() + row * cellHeight, cellWidth, cellHeight);
-
-			cell.reduce(kCellPadX, kCellPadY);
-			cell.removeFromTop(kCaptionHeight); // caption band, painted in paint()
-
-			visible[i]->setBounds(cell);
-		}
-		repaint();
 	}
 
-	std::vector<juce::Component*> CCSAudioProcessorEditor::GetAllComponents()
+	std::vector<juce::Component*> CCSAudioProcessorEditor::GetActiveComponents()
 	{
-		return { &m_MixSlider, &m_WarmthSlider, &m_AgeSlider, &m_ChorusRateSlider, &m_ChorusDepthSlider, &m_ChorusWidthSlider, &m_ChorusVoicesSlider, &m_FlangerRateSlider, &m_FlangerDepthSlider, &m_FlangerWidthSlider, &m_FlangerFeedbackSlider, &m_FlangerBaseDelaySlider, &m_PhaserRateSlider, &m_PhaserDepthSlider, &m_PhaserWidthSlider, &m_PhaserStagesSlider, &m_PhaserFeedbackSlider, &m_VibeRateSlider, &m_VibeDepthSlider, &m_VibeWidthSlider, &m_VibeModeButton };
+		const auto type = static_cast<EffectType>(m_LastEffectIndex);
+		switch (type)
+		{
+		case EffectType::Chorus:
+			return { m_ChorusRateKnob.get(), m_ChorusDepthKnob.get(), m_ChorusWidthKnob.get(), m_ChorusVoicesKnob.get() };
+		case EffectType::Flanger:
+			return { m_FlangerRateKnob.get(), m_FlangerDepthKnob.get(), m_FlangerWidthKnob.get(), m_FlangerFeedbackKnob.get(), m_FlangerBaseDelayKnob.get() };
+		case EffectType::Phaser:
+			return { m_PhaserRateKnob.get(), m_PhaserDepthKnob.get(), m_PhaserWidthKnob.get(), m_PhaserStagesKnob.get(), m_PhaserFeedbackKnob.get() };
+		case EffectType::Vibe:
+			return { m_VibeRateKnob.get(), m_VibeDepthKnob.get(), m_VibeWidthKnob.get(), &m_VibeModeButton };
+		default:
+			return {};
+		}
 	}
 }

@@ -10,14 +10,18 @@ C++20 / JUCE 8 / CMake.
 
 ## Current status
 
-- **Phase:** Milestone 5b complete — **all four effects plus the global Character stage (tape warmth
-  *and* tape age) are implemented and audible.** Chorus + Flanger (delay-line family) and Phaser +
-  **Vibe** (all-pass family) finished the DSP-effect track at M4; **M5 added a global `CharacterStage`**
-  (oversampled asymmetric-tanh saturation + high-cut tone, one **Warmth** macro) applied to the output
-  after the active effect; **M5b adds tape-age wow/flutter** to that same stage — a modulated fractional
-  delay (slow **wow** + fast **flutter** + band-limited random drift) driven by a second **Age** macro,
-  running *before* the saturation. Only GUI polish (custom `LookAndFeel`, per-effect panels, LFO
-  visualiser) remains — a separate, deferred pass, not a milestone.
+- **Phase:** Milestone 6a complete — **the plugin now wears a flat-vector "guitar-pedal" UI.** All four
+  effects plus the global Character stage (tape warmth *and* tape age) were finished by M5b; **M6a is the
+  first pure-GUI milestone**: a custom `CCSLookAndFeel` (cozy amber-on-brown skin, no image assets), a
+  reusable `LabeledKnob` composite, and a fixed **560×440 zone layout** — Mix top-left, a framed
+  **CHARACTER** box (Warmth + Age) top-right, the active effect's controls centred in a bottom row, and a
+  reserved recessed **"screen"** in the centre awaiting the **M6b** animated LFO visualiser. DSP is
+  unchanged — 6a is view-only. Chorus + Flanger (delay-line family) and Phaser + **Vibe** (all-pass
+  family) finished the DSP-effect track at M4; **M5 added a global `CharacterStage`** (oversampled
+  asymmetric-tanh saturation + high-cut tone, one **Warmth** macro) applied to the output after the
+  active effect; **M5b added tape-age wow/flutter** to that same stage — a modulated fractional delay
+  (slow **wow** + fast **flutter** + band-limited random drift) driven by a second **Age** macro,
+  running *before* the saturation. Only the **M6b LFO visualiser** remains.
 - **Params are per-effect (post-M4):** Rate / Depth / Stereo Width were split from shared params into
   **per-effect** APVTS params (`chorusRate`, `flangerRate`, …), so each effect carries its own defaults.
   **`mix` is the only shared *effect* param**; **`warmth`** and **`age`** are separate **global stage**
@@ -28,7 +32,8 @@ C++20 / JUCE 8 / CMake.
   is **deliberately not** PDC-reported (it is a time-varying pitch-modulation delay, part of the effect,
   not a fixed processing latency).
 - A hand-written **`CCSAudioProcessorEditor`** (rotary knobs + effect selector, per-effect control
-  visibility) has replaced the generic editor. Custom `LookAndFeel` / LFO visualiser still deferred.
+  visibility) has replaced the generic editor, now skinned by a custom **`CCSLookAndFeel`** and laid out
+  as a guitar-pedal faceplate (M6a). Only the **LFO visualiser** (M6b) is still deferred.
 - Builds as **VST3 + Standalone** via CMake + JUCE **8.0.14** with the `Visual Studio 18 2026`
   generator (MSVC v145). Artefacts land in
   `build/CozyChorusSuite_artefacts/<config>/{Standalone,VST3}/`.
@@ -133,9 +138,19 @@ Fixed order (delay-line family first, then all-pass family):
    (mono-correlated). A single **Age** macro (global `age` param, default 30 %) scales the whole sweep.
    Wow/flutter only — vinyl/tape *noise* was dropped from scope. Same POD/`SetParameters` shape; an Age
    knob joins Warmth in the editor (always visible).
-8. **GUI — in progress (functional).** A parameter-driven `CCSAudioProcessorEditor` now ships
-   (rotary knobs, effect selector, per-effect control visibility). Still deferred: custom
-   `LookAndFeel`, polished per-effect panels, and an LFO visualiser (possibly OpenGL).
+8. **Milestone 6a — Pedal UI. ✅ Done.** First pure-GUI milestone (no DSP). A custom
+   **`CCSLookAndFeel`** (`juce::LookAndFeel_V4`: flat-vector rotary, combo box + popup, LED toggle;
+   cozy amber-on-brown `Palette`, no image assets) skins the whole editor via one
+   `setLookAndFeel(&m_LookAndFeel)` that cascades to every child. A reusable **`LabeledKnob`**
+   composite (caption `Label` over a `Slider` with a value read-out) replaces the old paint-time
+   caption band. The editor is re-laid as a fixed **560×440 guitar-pedal faceplate** — header
+   (brand plate + effect selector), **Mix** top-left, a framed **CHARACTER** box (Warmth + Age)
+   top-right, a recessed **"screen"** reserved in the centre (kept as `m_ScreenZone` for M6b), and
+   the active effect's controls **centred** in a bottom row (replacing the wrap-at-4 grid). Mix is
+   greyed (`setEnabled(false)`) in Vibe's Vibrato mode. Lifetime-safe: `m_LookAndFeel` declared
+   first, `setLookAndFeel(nullptr)` in the destructor.
+9. **Milestone 6b — LFO visualiser. Next.** The animated LFO curve rendered into the reserved centre
+   `m_ScreenZone` (a `ModulationVisualiser` view, possibly OpenGL). The only remaining GUI work.
 
 ---
 
@@ -192,7 +207,10 @@ Source/
   PluginProcessor.h / .cpp   // AudioProcessor: owns APVTS + effect instances + CharacterStage; routes processBlock to active effect, then runs the Character stage on the output; reports oversampler latency via setLatencySamples
   Parameters.h               // parameter IDs + APVTS layout in one place
   Editor/
-    CCSAudioProcessorEditor.h / .cpp  // custom editor: effect selector + rotary knobs, per-effect control visibility (30 Hz Timer), wrapping-grid layout; createEditor() returns this
+    CCSAudioProcessorEditor.h / .cpp  // custom editor: effect selector + LabeledKnobs, per-effect control visibility (30 Hz Timer), pedal zone layout (header / Mix / CHARACTER box / reserved screen / centred bottom row); owns the CCSLookAndFeel; createEditor() returns this
+    CCSLookAndFeel.h / .cpp  // custom juce::LookAndFeel_V4 skin (M6a): drawRotarySlider / drawComboBox / drawPopupMenuBackground / drawToggleButton + the shared Palette namespace (flat-vector amber-on-brown, no assets)
+    LabeledKnob.h / .cpp     // reusable composite view (M6a): a caption Label stacked over a rotary Slider with a value read-out; getSlider() exposes the inner slider for APVTS attachment
+    EditorConstants.h        // shared layout metrics (kMargin, kHeaderHeight, zone widths, kKnobWidth/Height, corner radii) read by BOTH resized() and paint()
   dsp/
     ModulationEffect.h       // abstract base: Prepare(spec) / Process(context) / Reset()
     NullEffect.h             // pass-through; now ONLY the `default` guard in GetActiveEffect() — every built effect routes to itself
@@ -333,6 +351,53 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
     white noise gargled).
   - **Editor:** an **Age** rotary knob, always visible (like Warmth), added right after Warmth in
     `GetAllComponents()`; caption "Age".
+- **Pedal UI (M6a) — first pure-GUI milestone, no DSP change.** Three new/rewritten view pieces, all on
+  the message thread; `PluginProcessor`, `Parameters.h`, the `dsp/` tree and `CMakeLists.txt` are
+  untouched (sources are globbed, so the three new files compile with no CMake edit). No new parameter —
+  every knob still binds to an existing APVTS id.
+  - **`CCSLookAndFeel` (custom `juce::LookAndFeel_V4`):** a stateless flat-vector skin drawn entirely in
+    code — **no image assets**. Overrides `drawRotarySlider` (track arc + amber value arc + flat knob cap
+    + pointer line), `drawComboBox`, `drawPopupMenuBackground`, and `drawToggleButton` (an amber **LED**,
+    lit when on, with a glow halo + caption; reserves the same value-box band as a knob so its LED
+    centres on the knob dials). Label/text-box/combo/popup **colours** are set in the constructor via
+    `setColour(...)` rather than by overriding `drawLabel`. A shared **`Palette`** namespace
+    (`namespace CozyChorus::Palette` in the header) holds the cozy amber-on-brown colours
+    (`Background/Plate/Screen/TitleText/CaptionText/KnobBody/Track/Accent/Screw`). **Cascade:** the editor
+    calls `setLookAndFeel(&m_LookAndFeel)` **once** — JUCE resolves each control's L&F by walking up the
+    parent chain, so the one call skins every child, including the sliders **inside** each `LabeledKnob`.
+  - **Lifetime rule (the L&F footgun):** a `LookAndFeel` must outlive every component drawing with it.
+    `m_LookAndFeel` is declared **first** in the editor (destructs last) and the destructor calls
+    `setLookAndFeel(nullptr)` before members tear down. Both are required; omitting either dangles a
+    pointer during destruction.
+  - **`LabeledKnob` composite (`juce::Component`):** a caption `juce::Label` stacked over a
+    `RotaryHorizontalVerticalDrag` `juce::Slider` (with a `TextBoxBelow` value read-out). Owns both as
+    value members (`addAndMakeVisible`, no ownership transfer); `resized()` slices the caption off the
+    top and gives the rest to the slider. `getSlider()` exposes the inner slider so APVTS
+    `SliderAttachment`s bind to it. This **retires** the old paint-time `captionFor` map + caption-band
+    loop — captions are now real child components. Every knob (Mix, Warmth, Age, and all per-effect
+    controls) is a `std::unique_ptr<LabeledKnob>`; the Vibrato control stays a bare `juce::ToggleButton`.
+  - **Zone layout (replaces the wrapping grid):** a fixed **560×440** faceplate sliced once per
+    `resized()` with `removeFromTop/Left/Right/Bottom` into: **header** (brand plate drawn in `paint()` +
+    effect-selector `ComboBox` on the right), **Mix** (`m_MixZoneWidth` on the left, knob centred via
+    `withSizeKeepingCentre(kKnobWidth, kKnobHeight)`), a framed **CHARACTER** box (`kCharacterZoneWidth`
+    on the right; interior halved for Warmth + Age), a reserved recessed **"screen"** (the centre
+    remainder, stored as `m_ScreenZone` and painted as a placeholder — the future M6b visualiser bounds),
+    and a **bottom row** holding only the **active effect's** controls, **centred** (total width computed,
+    started at `bottomRow.getCentreX() - total/2`). Metrics live in **`EditorConstants.h`** and are read
+    by **both** `resized()` and `paint()` so the drawn frames never drift from the control positions.
+  - **Per-effect visibility unchanged in spirit:** the 30 Hz `Timer` still tracks `effectType`;
+    `RenderComponents()` hides all effect controls then shows/positions only the active set
+    (`GetActiveComponents()` returns the right `LabeledKnob*` list per `EffectType`).
+  - **Mix greyed in Vibrato:** the timer also reads `vibeMode`; when the Vibe is active **and** Vibrato is
+    on, `m_MixKnob->getSlider().setEnabled(false)` renders Mix via the disabled path (it is ignored in the
+    DSP there) without removing it from the layout.
+  - **Deferred to M6b:** the animated LFO curve inside `m_ScreenZone`. 6a paints that rectangle as a
+    static recessed screen only.
+  - **Open cleanups (not blockers):** `EditorConstants.h` still carries the pre-M6a grid constants
+    (`kMaxColumns`, `kCellPad*`) and a duplicate `kBackground/kTitleText/kCaptionText` colour set now
+    superseded by `Palette` — dead once M6b lands. `timerCallback()` calls `RenderComponents()` every tick
+    (full relayout at 30 Hz) rather than only on change; harmless on the message thread. `Palette::Screw`
+    + screw metrics are defined but not yet drawn.
 
 ---
 

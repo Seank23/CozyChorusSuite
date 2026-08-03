@@ -20,6 +20,74 @@ belongs here.
 
 ---
 
+## 2026-08-03 — Session 12: Milestone 6a — Pedal UI (custom LookAndFeel + zone layout)
+
+**Done:**
+- First **pure-GUI** milestone — **no DSP change**. `PluginProcessor`, `Parameters.h`, the `dsp/` tree and
+  `CMakeLists.txt` are all untouched; the three new editor files compile via the existing source glob.
+- **`CCSLookAndFeel`** (`Source/Editor/CCSLookAndFeel.h/.cpp`) — a custom `juce::LookAndFeel_V4` skin drawn
+  **entirely in code, no image assets**. Overrides `drawRotarySlider` (unfilled track arc + amber value
+  arc + flat knob cap + pointer line), `drawComboBox`, `drawPopupMenuBackground`, and `drawToggleButton`
+  (an amber **LED** with a glow halo + caption when lit, reserving the same value-box band so it centres
+  with the knob dials). Label / text-box / combo / popup **colours** are set in the constructor via
+  `setColour(...)` instead of overriding `drawLabel`. A shared **`Palette`** namespace
+  (`namespace CozyChorus::Palette`, in the header) holds the cozy amber-on-brown colours. One
+  `setLookAndFeel(&m_LookAndFeel)` on the editor **cascades** to every child (JUCE walks the parent chain
+  to resolve a control's L&F), so the sliders **inside** each `LabeledKnob` are skinned too.
+- **`LabeledKnob`** (`Source/Editor/LabeledKnob.h/.cpp`) — a reusable `juce::Component` composite: a
+  caption `Label` stacked over a `RotaryHorizontalVerticalDrag` `Slider` with a `TextBoxBelow` read-out.
+  `resized()` slices the caption off the top; `getSlider()` exposes the inner slider for APVTS
+  attachment. This **retires** the old paint-time `captionFor` map + caption-band loop — captions are now
+  real child components. Every knob is a `std::unique_ptr<LabeledKnob>`; Vibrato stays a bare
+  `juce::ToggleButton`.
+- **`EditorConstants.h`** — new header holding the shared layout metrics (margins, header height, zone
+  widths, `kKnobWidth/Height`, corner radii, screw sizes) read by **both** `resized()` and `paint()`.
+- **`CCSAudioProcessorEditor` rewrite** — retired the wrap-at-4 uniform grid for a fixed **560×440
+  guitar-pedal faceplate**, sliced once per `resized()` with `removeFromTop/Left/Right/Bottom`:
+  **header** (brand plate painted + effect-selector `ComboBox` on the right) · **Mix** top-left, centred
+  in its zone via `withSizeKeepingCentre(kKnobWidth, kKnobHeight)` · framed **CHARACTER** box top-right,
+  interior halved for **Warmth + Age** · a recessed **"screen"** reserved in the centre (stored as
+  `m_ScreenZone`, painted as a placeholder — the future M6b visualiser bounds) · the **active effect's**
+  controls **centred** in a bottom row. `paint()` draws the chassis plate, brand plate, CHARACTER frame +
+  title, and the screen recess; the 30 Hz `Timer` still swaps per-effect visibility.
+- **Mix greyed in Vibrato:** the timer reads `vibeMode`; Vibe active + Vibrato on ⇒
+  `m_MixKnob->getSlider().setEnabled(false)` (disabled draw path, Mix is ignored by the Vibe DSP there),
+  without dropping it from the layout.
+- Updated `CLAUDE.md` (Phase/Current status, editor bullet, build-order — Milestone 6a marked done + a new
+  Milestone 6b line, `Source/Editor/` tree entries, and a full M6a settled-design-decision block) and
+  added this DEVLOG entry.
+
+**Decisions:**
+- **Flat-vector "cozy" aesthetic, no assets** (locked in the M6a planning forks, alongside: animated LFO
+  viz deferred to **6b**, and splitting the GUI work **6a → 6b**). Everything is `juce::Graphics`
+  primitives + a shared `Palette` — nothing to bundle, resolution-independent, easy to retint.
+- **One `LookAndFeel` for the whole editor, cascaded** rather than per-control skins — the idiomatic JUCE
+  approach; the single `setLookAndFeel` reaches composite children automatically.
+- **Lifetime rule enforced:** `m_LookAndFeel` declared **first** (destructs last) + `setLookAndFeel(nullptr)`
+  in the destructor — both required so no child dangles a L&F pointer during teardown.
+- **Colours via `setColour` over `drawLabel`:** simpler than a full label-draw override for what 6a needs
+  (just text colour); the draw overrides are reserved for the shapes that actually change (knob, combo,
+  popup, toggle LED).
+- **Metrics centralised in `EditorConstants.h`** so `paint()` (frames/titles) and `resized()` (control
+  positions) read the same numbers and can't drift — the discipline the pre-M6a caption band already relied on.
+
+**Next up (M6b):**
+- The **animated LFO visualiser** rendered into the reserved `m_ScreenZone` — a `ModulationVisualiser`
+  view (possibly OpenGL) reading the active effect's LFO. Only remaining GUI work.
+
+**Open questions / blockers:**
+- **Dead code to sweep when 6b lands:** `EditorConstants.h` still carries the old grid constants
+  (`kMaxColumns`, `kCellPadX/Y`) and a duplicate `kBackground/kTitleText/kCaptionText` colour set now
+  superseded by `Palette`.
+- `timerCallback()` calls `RenderComponents()` **every tick** (full relayout at 30 Hz) rather than only on
+  effect/mode change — harmless on the message thread, but a cheap win to gate on change if wanted.
+- `Palette::Screw` + screw metrics are defined but **not yet drawn** in `paint()` — a small decorative
+  extra left for a polish pass.
+- By-ear DSP tuning from Sessions 10–11 (M5/M5b endpoints, per-effect defaults) and the missing
+  `pluginval` / automated DSP test remain open, unchanged by this GUI milestone.
+
+---
+
 ## 2026-07-31 — Session 11: Milestone 5b — Character tape age (wow/flutter)
 
 **Done:**
