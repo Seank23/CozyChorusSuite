@@ -130,7 +130,7 @@ Fixed order (delay-line family first, then all-pass family):
    LFO phase offset for stereo width, all params smoothed). `Voices` is wired and exposed (added
    post-M1 in Session 5); selectable LFO shape still exists in code but is not user-selectable.
 3. **Milestone 2 — Flanger. ✅ Done.** Reuses the delay-line skeleton with **feedback** + a shorter
-   **0.5–5 ms base delay**: `FlangerEffect` (pop-before-push feedback comb;
+   **0.2–5 ms base delay**: `FlangerEffect` (pop-before-push feedback comb;
    Rate/Depth/Mix/Width/Feedback/BaseDelay, all smoothed). A custom `CCSAudioProcessorEditor`
    (`Source/Editor/`) landed alongside — effect selector + rotary knobs, per-effect control
    visibility. See the Flanger notes below for shipped tuning caveats.
@@ -304,7 +304,7 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
 - **Flanger topology (M2):** the delay-line skeleton reused as a **feedback comb** — per sample
   `popSample` (read the modulated delay) **then** `pushSample(input + feedback·wet)`, i.e. read
   before write, so the minimum effective delay is 1 sample (hence `MIN_DELAY_SAMPLES = 1`). Base
-  delay 0.5–5 ms; the LFO sweeps the delay **upward** from base by up to +5 ms (`0.5 + 0.5·sin`,
+  delay 0.2–5 ms; the LFO sweeps the delay **upward** from base by up to +5 ms (`0.5 + 0.5·sin`,
   unipolar); feedback ±0.95; stereo width reuses the Chorus per-channel phase-offset trick.
   Rate/Depth/Width are **per-effect params** (`flangerRate`/`flangerDepth`/`flangerWidth`); `mix` is the
   only shared param; Feedback + Base Delay are Flanger-only.
@@ -323,7 +323,7 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
   cascade: `input += feedbackState·feedback` before the stages, `feedbackState = cascadeOutput` after
   (±0.95). Stereo width reuses the Chorus/Flanger per-channel LFO phase-offset trick. Rate/Depth/
   Width are **per-effect params** (`phaserRate`/…); `mix` is the only shared param; **Stages** (2–12,
-  default 6) and **Feedback** (default 0) are Phaser-only. No delay line — this is the first effect that allocates no delay buffer.
+  default 6) and **Feedback** (default 30 %) are Phaser-only. No delay line — this is the first effect that allocates no delay buffer.
 - **Vibe topology (M4):** the Phaser's all-pass skeleton, reworked into a Uni-Vibe by three deltas —
   everything else (TPT kernel, exponential log sweep, per-channel width offset, POD-per-block dispatch,
   show/hide editor) is reused. (1) **Fixed 4 stages, each staggered** to its own break frequency: one
@@ -529,7 +529,8 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
 
 ## DSP reference (per effect)
 
-**Shared LFO:** sine/triangle, rate range **0.05–5 Hz**, per-channel phase offset for stereo
+**Shared LFO:** sine/triangle, rate range **0.05–5 Hz** (every `*Rate` param is skewed for resolution at
+the slow end — 0.35 for Chorus/Flanger, 0.4 for Phaser/Vibe), per-channel phase offset for stereo
 width, continuous phase across blocks. `GetPhase()` exposes the running phase; `ModulationEffect` re-exports
 it as `GetCurrentLFOPhase()` for the M6b visualiser. **Since M6b, `SetFrequency(m_RateHz.getNextValue())` is
 called per sample** in all four effects (it was once per block, which stretched the Rate smoother's 20 ms
@@ -543,13 +544,13 @@ ramp by the block size).
 - **No feedback** (feedback is what makes it a flanger).
 - Optional after single-voice works: 2–3 parallel taps (ensemble).
 
-| Param | Range | Notes |
-|---|---|---|
-| Rate | 0.05–5 Hz | LFO speed |
-| Depth | 0–100% | delay-time modulation amount |
-| Mix | 0–100% | dry/wet |
-| Voices | 1–3 | start at 1 |
-| Stereo Width | 0–100% | L/R LFO phase offset |
+| Param | Range | Default | Notes |
+|---|---|---|---|
+| Rate | 0.05–5 Hz (skew 0.35) | 0.6 Hz | LFO speed |
+| Depth | 0–100% | 70% | delay-time modulation amount (±7 ms at full depth) |
+| Mix | 0–100% | 50% | dry/wet (shared) |
+| Voices | 1–3 | 3 | summed delay taps (the brief said "start at 1"; the shipped default is the full 3-voice ensemble) |
+| Stereo Width | 0–100% | 75% | L/R LFO phase offset |
 
 Smooth Rate, Depth, Mix, Width with `SmoothedValue`.
 
@@ -561,26 +562,27 @@ delay 20 ms, ±7 ms modulation, params smoothed over 20 ms.
 ### Flanger (Milestone 2)
 - `input --> modulated fractional delay line (with feedback) --> wet`; `output = dry*(1-mix) + wet*mix`.
 - Same `juce::dsp::DelayLine<float, Lagrange3rd>`, max delay ~15 ms.
-- Base delay 0.5–5 ms; the LFO sweeps the delay **upward** from base by up to +5 ms at full depth.
+- Base delay 0.2–5 ms; the LFO sweeps the delay **upward** from base by up to +5 ms at full depth.
 - **Feedback** (−0.95…+0.95) closes the comb → the resonant "jet" sweep (the thing that makes it a
   flanger and not a chorus). pop-before-push feedback loop.
 - Stereo: reuses the Chorus per-channel LFO phase offset; Width scales it.
 
-| Param | Range | Notes |
-|---|---|---|
-| Rate | 0.05–5 Hz | LFO speed (per-effect) |
-| Depth | 0–100% | delay-sweep amount, up to +5 ms (per-effect) |
-| Mix | 0–100% | dry/wet (shared) |
-| Feedback | −95…95% | comb feedback, mapped to ±0.95 coefficient (skew 0.4, default 45%) |
-| Base Delay | 0.2–5 ms | shortest delay / sweep floor (default 1 ms) |
-| Stereo Width | 0–100% | L/R LFO phase offset (per-effect) |
+| Param | Range | Default | Notes |
+|---|---|---|---|
+| Rate | 0.05–5 Hz (skew 0.35) | 0.5 Hz | LFO speed (per-effect) |
+| Depth | 0–100% | 80% | delay-sweep amount, up to +5 ms (per-effect) |
+| Mix | 0–100% | 50% | dry/wet (shared) |
+| Feedback | −95…95% (linear) | 60% | comb feedback, mapped to ±0.95 coefficient |
+| Base Delay | 0.2–5 ms (skew 0.4) | 0.65 ms | shortest delay / sweep floor |
+| Stereo Width | 0–100% | 50% | L/R LFO phase offset (per-effect) |
 
 **Shipped M2 (+ tuning):** functionally correct and RT-safe — verified by offline impulse-response
 measurement (feedback lifts the resonant peak 0 → +14.6 dB at fb 0.9; base delay moves the comb by
 1/D). Two of the three M2 tuning caveats were then addressed in the shipped params: feedback now
-**defaults to 45%** (audible resonance out of the box) with a **skewed taper** (`skew 0.4`, so the
-knob's travel is no longer bunched into the top quarter), and the **base delay default dropped to
-1 ms** (range widened to 0.2–5 ms). Remaining caveat, not a bug: the sweep is still **upward-only from
+**defaults to 60%** (audible resonance out of the box), and the **base delay default dropped to
+0.65 ms** (range widened to 0.2–5 ms) with a **skewed taper** (`skew 0.4`, so the knob's travel is no
+longer bunched into the bottom of the range — the taper is on **Base Delay**, not on Feedback, whose
+−95…95% range is linear). Remaining caveat, not a bug: the sweep is still **upward-only from
 base**, so the comb's top-end reach is limited, and its own `flangerDepth` param reuses Chorus's
 depth-scaling behaviour rather than defining a bespoke range. See DEVLOG Session 6.
 
@@ -596,14 +598,14 @@ Through-zero flanging is an optional later refinement.
 - Stereo: reuses the per-channel LFO phase offset; Width scales it.
 - **No delay buffer** — the first effect that allocates none.
 
-| Param | Range | Notes |
-|---|---|---|
-| Rate | 0.05–5 Hz | LFO speed (per-effect) |
-| Depth | 0–100% | cutoff-sweep amount (per-effect) |
-| Mix | 0–100% | dry/wet (shared) |
-| Stages | 2–12 | number of all-pass stages (default 6) |
-| Feedback | −95…95% | cascade feedback, mapped to ±0.95 coefficient (default 0) |
-| Stereo Width | 0–100% | L/R LFO phase offset (per-effect) |
+| Param | Range | Default | Notes |
+|---|---|---|---|
+| Rate | 0.05–5 Hz (skew 0.4) | 0.8 Hz | LFO speed (per-effect) |
+| Depth | 0–100% | 80% | cutoff-sweep amount (per-effect) |
+| Mix | 0–100% | 50% | dry/wet (shared) |
+| Stages | 2–12 | 6 | number of all-pass stages |
+| Feedback | −95…95% (linear) | 30% | cascade feedback, mapped to ±0.95 coefficient |
+| Stereo Width | 0–100% | 50% | L/R LFO phase offset (per-effect) |
 
 **Shipped M3:** functionally correct and RT-safe — all state (`m_AllPassState`, `m_FeedbackState`)
 allocated in `Prepare`, params smoothed over 20 ms, LFO phase advanced **once per sample** (a
@@ -625,13 +627,13 @@ peaks. Tuning by ear against reference phaser material still open for a later po
   1.0 in the DSP.
 - Stereo: reuses the per-channel LFO phase offset; Width scales it.
 
-| Param | Range | Notes |
-|---|---|---|
-| Rate | 0.05–5 Hz | LFO speed (per-effect) |
-| Depth | 0–100% | sweep span (per-effect) |
-| Mix | 0–100% | dry/wet (shared); **ignored in Vibrato mode** (forced 100 % wet) |
-| Vibrato | Off/On | mode switch: Off = Chorus (blend), On = Vibrato (100 % wet). `AudioParameterBool`, **default On** (`VibeParameters::Vibrato = true`) — the Vibe boots as a vibrato, with Mix greyed out |
-| Stereo Width | 0–100% | L/R LFO phase offset (per-effect) |
+| Param | Range | Default | Notes |
+|---|---|---|---|
+| Rate | 0.05–5 Hz (skew 0.4) | 2.5 Hz | LFO speed (per-effect) — much faster than the other three by default |
+| Depth | 0–100% | 80% | sweep span (per-effect) |
+| Mix | 0–100% | 50% | dry/wet (shared); **ignored in Vibrato mode** (forced 100 % wet) |
+| Vibrato | Off/On | **On** | mode switch: Off = Chorus (blend), On = Vibrato (100 % wet). `AudioParameterBool` (`VibeParameters::Vibrato = true`) — the Vibe boots as a vibrato, with Mix greyed out |
+| Stereo Width | 0–100% | 50% | L/R LFO phase offset (per-effect) |
 
 **Shipped M4:** functionally correct and RT-safe — all state (`m_AllPassState`) allocated in `Prepare`,
 Rate/Depth/Mix/Width smoothed over 20 ms, LFO phase advanced **once per sample**, no allocation in
@@ -665,10 +667,10 @@ material is still open.
 - **Latency:** the oversampler adds a few samples; reported via `setLatencySamples` (PDC). The M5b
   wow/flutter delay (~2 ms) is **not** PDC-reported (time-varying modulation delay, part of the effect).
 
-| Param | Range | Notes |
-|---|---|---|
-| Warmth | 0–100% | **global** macro (default 30 %); drives saturation amount **and** high-cut together |
-| Age | 0–100% | **global** macro (default 30 %); scales wow/flutter pitch-modulation depth (0 % = off) |
+| Param | Range | Default | Notes |
+|---|---|---|---|
+| Warmth | 0–100% | 30% | **global** macro; drives saturation amount **and** high-cut together |
+| Age | 0–100% | 30% | **global** macro; scales wow/flutter pitch-modulation depth (0 % = off) |
 
 **Shipped M5:** functionally correct and RT-safe — oversampler + filter allocated in `Prepare`,
 `Process` allocation-free, Warmth smoothed 20 ms (read once per block). One post-ship fix: the
