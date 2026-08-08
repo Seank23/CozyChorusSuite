@@ -16,16 +16,13 @@ namespace CozyChorus
 	class FlangerEffect : public ModulationEffect
 	{
 	public:
-		FlangerEffect();
-		~FlangerEffect();
-
 		virtual void Prepare(const juce::dsp::ProcessSpec& spec) override;
 		virtual void Process(const juce::dsp::ProcessContextReplacing<float>& context) override;
 		virtual void Reset() override;
 
 		void SetParameters(const FlangerParameters& params);
 
-		float GetDelayInSamples() const { return m_DelayInSamples; }
+		float GetDelayInSamples() const { return m_ReferenceDelayInSamples; }
 
 	private:
 		juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> m_DelayLine;
@@ -34,7 +31,7 @@ namespace CozyChorus
 
 		int m_MaxDelaySamples = 0;
 
-		float m_DelayInSamples = 0.0f;
+		float m_ReferenceDelayInSamples = 0.0f;
 
 		static constexpr float MAX_DELAY_MS = 15.0f;
 		static constexpr float MAX_SWEEP_MS = 5.0f;

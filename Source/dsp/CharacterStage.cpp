@@ -2,14 +2,6 @@
 
 namespace CozyChorus
 {
-	CharacterStage::CharacterStage()
-	{
-	}
-
-	CharacterStage::~CharacterStage()
-	{
-	}
-
 	void CharacterStage::Prepare(const juce::dsp::ProcessSpec& spec)
 	{
 		m_SampleRate = spec.sampleRate;
@@ -31,7 +23,8 @@ namespace CozyChorus
 			spec.numChannels,
 			OS_FACTOR_LOG2,
 			juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR,
-			/*isMaximumQuality*/ true);
+			true,
+			true);
 		m_Oversampler->initProcessing(spec.maximumBlockSize);
 
 		m_WarmthFilter.prepare(spec);
@@ -41,6 +34,9 @@ namespace CozyChorus
 
 	void CharacterStage::Process(const juce::dsp::ProcessContextReplacing<float>& context)
 	{
+		if (context.isBypassed)
+			return;
+
 		auto&& block = context.getOutputBlock();
 		const int numSamples = block.getNumSamples();
 		const int numChannels = block.getNumChannels();

@@ -25,6 +25,17 @@ C++20 / JUCE 8 / CMake.
   wow/flutter** to that same stage — a modulated fractional delay (slow **wow** + fast **flutter** +
   band-limited random drift) driven by a second **Age** macro, running *before* the saturation. Nothing on
   the original milestone list remains; further work is polish (by-ear tuning, `pluginval`, DSP tests).
+- **Session 14 was a code-review + fix pass, not a milestone** (see the DEVLOG entry for the full finding
+  list). Two real defects were found and fixed: the Chorus emitted **NaN** for ~294 samples whenever it
+  became the active effect (`Prepare` reset the smoothers *before* `SetParameters`, so `m_Voices` ramped
+  from 0, `static_cast<int>` floored it to 0, and `wetSum / voices` was `0.0f / 0`), and the rotary
+  **value arc never rendered** (`drawRotarySlider` passed the arc's bounding-box corner where
+  `Path::addCentredArc` wants radii, so both arcs were drawn as a tiny ellipse under the knob cap that
+  was then filled over them). Both are fixed; see **Prepare ordering** under Settled design decisions.
+  Still open after that pass: mode-switch clicks (Vibe `effectiveMix` jumps 0.5→1.0 on the Vibrato
+  toggle; Phaser `m_Stages` changes instantly and stale state on removed stages is reused if the count
+  goes back up), the unguarded `MAX_CHANNELS = 2` in Phaser/Vibe, the spectrum-vs-Vibrato blend gap, and
+  ~34 narrowing warnings (C4244/C4267) plus the 5 unreferenced-parameter warnings in `drawComboBox`.
 - **M6b was *not* purely view-only** (unlike 6a): besides the read-only visualiser exports, the LFO rate
   update `m_LFO.SetFrequency(m_RateHz.getNextValue())` moved from **once per block to once per sample** in
   all four effects — the Rate smoother now actually runs at sample rate (previously it advanced one step
@@ -35,7 +46,9 @@ C++20 / JUCE 8 / CMake.
   **`mix` is the only shared *effect* param**; **`warmth`** and **`age`** are separate **global stage**
   params (the Character stage, not effect controls).
 - **Character stage reports latency (PDC):** the 2× oversampler adds a few samples of latency, reported
-  once via `setLatencySamples(m_CharacterStage.GetLatencySamples())` in `prepareToPlay` — the suite's
+  once via `setLatencySamples(m_CharacterStage.GetLatencySamples())` in `prepareToPlay`. Since Session 14
+  the oversampler is constructed with **`useIntegerLatency = true`**, so its latency is a whole number of
+  samples and the reported figure is exact rather than a `std::round` of a fractional one — the suite's
   first use of host delay compensation. The M5b wow/flutter delay line adds a ~2 ms nominal delay that
   is **deliberately not** PDC-reported (it is a time-varying pitch-modulation delay, part of the effect,
   not a fixed processing latency).
@@ -142,7 +155,7 @@ Fixed order (delay-line family first, then all-pass family):
 7. **Milestone 5b — Character (tape age / wow+flutter). ✅ Done.** Adds slow pitch instability to the
    same `CharacterStage`, **before** the saturation: a modulated fractional delay
    (`juce::dsp::DelayLine<Lagrange3rd>`, 2 ms centre ±1.5 ms) whose delay is swept by **wow** (0.556 Hz
-   sine), **flutter** (12 Hz sine) and **band-limited random drift** (a per-block `juce::Random` sample
+   sine), **flutter** (12 Hz sine) and **band-limited random drift** (a per-sample `juce::Random` value
    through a one-pole ~2 Hz LPF with makeup gain). One shared modulation value across channels
    (mono-correlated). A single **Age** macro (global `age` param, default 30 %) scales the whole sweep.
    Wow/flutter only — vinyl/tape *noise* was dropped from scope. Same POD/`SetParameters` shape; an Age
@@ -261,6 +274,16 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
   builds a plain per-effect POD (`ChorusParameters`, percentages converted to 0–1) and hands it to
   `ChorusEffect::SetParameters`, which feeds per-control `SmoothedValue`s. Effects expose their own
   `SetParameters(const XxxParameters&)` rather than reading the APVTS directly.
+- **`Prepare` ordering — `SetParameters` BEFORE the smoother resets (settled Session 14).** Every effect's
+  `Prepare` must call `SetParameters(XxxParameters{})` *first*, then `smoothedVal->reset(sampleRate, 0.02)`.
+  JUCE's `SmoothedValue::reset(numSteps)` does `setCurrentAndTargetValue(this->target)`, and a
+  default-constructed `SmoothedValue<float, Linear>` has `target == 0` — so resetting first and setting the
+  targets second makes **every** control ramp up from zero over the first 20 ms of processing. With
+  `stepsToTarget` still 0 at the time `SetParameters` runs, `setTargetValue` snaps current to target
+  instead, and the following `reset` keeps it there. Harmless-looking for most controls, fatal for the
+  Chorus's `Voices`: `static_cast<int>` floored the ramp to 0 and `wetSum / voices` produced **NaN** for
+  ~294 samples every time Chorus became active. `voices` is additionally clamped with `std::max(..., 1)`
+  as a second line of defence. This is why the ordering is load-bearing, not cosmetic.
 - **Per-effect Rate/Depth/Width params (post-M4):** Rate, Depth and Stereo Width were split from shared
   APVTS params into **per-effect** params — `chorusRate`/`chorusDepth`/`chorusWidth`, and likewise
   `flanger*`/`phaser*`/`vibe*` — each defaulting from that effect's `XxxParameters` POD in
@@ -309,8 +332,8 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
   (2) **Asymmetric LFO owned by `VibeEffect`:** the shared `LFO` stays shape-agnostic and only exposes
   `GetPhase()`; `VibeEffect::GetAsymmetricShape` warps the phase (piecewise-linear, `ASYM_K = 0.35`)
   then takes a sine — a smooth, skewed throb, no `SetShape` call. (3) **Chorus / Vibrato mode**
-  (`vibeMode` **bool** + `ToggleButton`): Vibrato forces `effectiveMix = 1.0` (100 % wet, so the swept
-  group delay reads as pitch wobble); Chorus uses the shared Mix blend. **No feedback** (no
+  (`vibeMode` **bool** + `ToggleButton`, **default on**): Vibrato forces `effectiveMix = 1.0` (100 % wet,
+  so the swept group delay reads as pitch wobble); Chorus uses the shared Mix blend. **No feedback** (no
   `m_FeedbackState`), **no delay buffer** — only fixed `std::array` all-pass state. `fc` clamped to the
   200 Hz–2 kHz sweep range. Rate/Depth/Width are **per-effect params** (`vibeRate`/…); `mix` is the only
   shared param; the mode bool is the only Vibe-specific param. Stagger spread + `ASYM_K` are **tuned by ear, not measured**.
@@ -333,7 +356,8 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
   per block). All state (oversampler, filter) allocated in `Prepare`; `Process` is allocation-free
   (`processSamplesUp`/`Down` reuse the oversampler's internal buffers). **Latency:** the oversampler's
   IIR adds a few samples, reported once via `setLatencySamples(m_CharacterStage.GetLatencySamples())`
-  in `prepareToPlay` (the suite's first PDC). **`warmth` is a global stage param** (default 30 %), not
+  in `prepareToPlay` (the suite's first PDC). The oversampler is built with **`useIntegerLatency = true`**
+  (Session 14), so that latency is an exact integer. **`warmth` is a global stage param** (default 30 %), not
   an effect control and independent of `effectType`. (`DRIVE_MAX`/cutoff endpoints were retuned by ear
   during M5b — was 4 / 6.5 kHz at M5.) Drive/bias/cutoff endpoints are **tuned by ear**.
   - **Editor:** a **Warmth** rotary knob, always visible (like Mix, independent of `effectType`), added
@@ -349,9 +373,11 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
   `(CENTER_DELAY_MS + HALF_SPAN_DELAY_MS·mod·age)·0.001·fs` with `CENTER = 2 ms`, `HALF_SPAN = 1.5 ms`.
   `mod = WOW_WEIGHT·wowSine + FLUTTER_WEIGHT·flutterSine + NOISE_WEIGHT·driftMakeup` (weights
   `0.8 / 0.04 / 0.02`) — two `LFO` instances (`WOW_FREQUENCY = 0.556 Hz`, `FLUTTER_FREQUENCY = 12 Hz`,
-  advanced once per sample) plus **band-limited random drift**: one `juce::Random` sample **per block**,
+  advanced once per sample) plus **band-limited random drift**: one `juce::Random` value **per sample**,
   bipolar, run through a one-pole LPF (`NOISE_LPF_HZ = 2 Hz`, coeff precomputed in `Prepare`) with a
-  `1/√(coeff/2)` **makeup gain** to restore amplitude after the heavy lowpass. **One shared `mod`/delay
+  `1/√(coeff/2)` **makeup gain** to restore amplitude after the heavy lowpass — the makeup is derived for
+  white noise at sample rate, so the per-sample draw is what makes the gain correct (a per-block draw
+  would also make the drift block-size dependent). **One shared `mod`/delay
   across channels** (mono-correlated, physically correct for one transport). A single **Age** macro
   (global `age` param, default 30 %, smoothed 20 ms, read **per sample**) scales `mod`, so Age 0 % ⇒ a
   static 2 ms delay (inaudible) and 100 % ⇒ full wander. **No feedback.** State (delay line, LFOs,
@@ -377,7 +403,8 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
     centres on the knob dials). Label/text-box/combo/popup **colours** are set in the constructor via
     `setColour(...)` rather than by overriding `drawLabel`. A shared **`Palette`** namespace
     (`namespace CozyChorus::Palette` in the header) holds the cozy amber-on-brown colours
-    (`Background/Plate/Screen/TitleText/CaptionText/KnobBody/Track/Accent/Screw`). **Cascade:** the editor
+    (`Background/Plate/Screen/TitleText/CaptionText/KnobBody/Track/Accent`; `Trace` joined in M6b).
+    **Cascade:** the editor
     calls `setLookAndFeel(&m_LookAndFeel)` **once** — JUCE resolves each control's L&F by walking up the
     parent chain, so the one call skins every child, including the sliders **inside** each `LabeledKnob`.
   - **Lifetime rule (the L&F footgun):** a `LookAndFeel` must outlive every component drawing with it.
@@ -409,12 +436,14 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
   - **Deferred to M6b (now delivered):** the animated curve inside the screen rect. 6a painted that
     rectangle as a static recessed placeholder; M6b replaced it with the `ModulationVisualiser`, which
     draws its own recess.
-  - **Open cleanups (not blockers, still open after M6b):** `EditorConstants.h` still carries the pre-M6a
-    grid constants (`kMaxColumns`, `kCellPad*`) and a duplicate `kBackground/kTitleText/kCaptionText`
-    colour set superseded by `Palette`; `m_ScreenZone` is still **declared** in the editor header but no
-    longer assigned (the visualiser owns those bounds now). `timerCallback()` calls `RenderComponents()`
-    every tick (full relayout at 30 Hz) rather than only on change; harmless on the message thread.
-    `Palette::Screw` + screw metrics are defined but not yet drawn.
+  - **Open cleanups — cleared in Session 14.** `EditorConstants.h` has lost the pre-M6a grid constants
+    (`kMaxColumns`, `kCellPad*`) and the duplicate `kBackground/kTitleText/kCaptionText` colour set that
+    `Palette` superseded, and now lives in `namespace CozyChorus` rather than an anonymous namespace.
+    `timerCallback()` no longer calls `RenderComponents()` every tick — it re-renders **only when
+    `effectType` changes**, with `m_LastEffectIndex` seeded from the parameter in the constructor so the
+    first `resized()` lays out the right effect. (The old per-tick call ran `HideAllEffectComponents()`
+    and then re-showed the active set, so every visible knob toggled `visible → hidden → visible` 30×/s,
+    each transition calling `repaintParent()` — not the harmless relayout first recorded here.)
 
 - **Modulation visualiser (M6b) — the centre screen comes alive.** One new view
   (`Source/Editor/ModulationVisualiser.h/.cpp`) plus a small read-only export surface on the DSP side.
@@ -427,8 +456,17 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
     sample rate. No locks, no allocation, no new latency; the GUI never touches DSP objects.
   - **Read-only DSP exports:** `ModulationEffect::GetCurrentLFOPhase()` on the **base** covers all four
     effects in one line (`m_LFO` is a base member); `ChorusEffect`/`FlangerEffect` gained
-    `GetDelayInSamples()`, backed by a new `m_DelayInSamples` member that replaces what used to be a local
-    `delaySample` inside the per-sample loop. `PhaserEffect::MIN_FC_HZ/MAX_FC_HZ`,
+    `GetDelayInSamples()`, backed by `m_ReferenceDelayInSamples`. **Reference tap (fixed in Session 14):**
+    M6b assigned that member from inside the voice **and** channel loops, so it ended up holding the *last*
+    voice on the *last* channel — up to ±4 ms of voice spread and ~240° of LFO phase away from the phase
+    published beside it. It is now written only under `if (ch == 0 && v == 0)` (Chorus) / `if (ch == 0)`
+    (Flanger): **voice 0 on channel 0 is the only tap read at LFO phase offset `0.0f`**, i.e. the same
+    phase `GetCurrentLFOPhase()` publishes, so the Signal and LFO views stay in lock-step. The per-tap
+    local is back and is what `popSample` receives, so the exported value is literally (post-clamp) the
+    number handed to the delay line. It stays a plain `float` — `GetDelayInSamples()` is only ever called
+    from `processBlock`, so the atomic boundary is already in `PluginProcessor`. Accepted trade-off: voice
+    0's base delay is 20/18/16 ms at 1/2/3 voices, so the displayed offset steps with the Voices knob.
+    `PhaserEffect::MIN_FC_HZ/MAX_FC_HZ`,
     `VibeEffect::NUM_STAGES/MIN_FC_HZ/MAX_FC_HZ/STAGE_OFFSET` and `VibeEffect::GetAsymmetricShape` were
     promoted from private to **public** (the last one to `static`) so the view derives its curves from the
     **same constants and shape function as the DSP** rather than duplicating magic numbers. Vibe's
@@ -444,13 +482,15 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
   - **Two modes, click to toggle:** `Mode::LFO` and `Mode::Response` (default **Response**), swapped in
     `mouseDown` with a pointing-hand cursor; a corner caption names the current view ("LFO" / "Signal" /
     "Spectrum"). Mode is **view state only** — not a parameter, not persisted.
-  - **LFO mode:** `kVisCyclesShown = 6` cycles across the width, drawn from the published phase so it
+  - **LFO mode:** `kVisCyclesShown` cycles across the width (6 at M6b, retuned to **4** in Session 14),
+    drawn from the published phase so it
     scrolls in lock-step with the DSP (and **freezes when the host stops processing** — a useful tell).
     Amplitude ∝ that effect's Depth param; shape per effect — sine for Chorus/Flanger/Phaser,
     `VibeEffect::GetAsymmetricShape` for the Vibe throb.
   - **Response mode is family-adaptive**, mirroring the two DSP families:
     - **Delay family (Chorus, Flanger)** — a dry sinusoid (`Palette::Trace`) and a wet copy
-      (`Palette::Accent`) shifted horizontally by the **live** delay at `kVisPxPerMs = 2 px/ms`, so the
+      (`Palette::Accent`) shifted horizontally by the **live** delay at `kVisPxPerMs` (2 px/ms at M6b,
+      retuned to **1 px/ms** in Session 14), so the
       modulation is read directly as a breathing time offset. No filtering maths involved.
     - **All-pass family (Phaser, Vibe)** — the **analytic** magnitude response of the wet/dry sum on a log
       frequency axis (50 Hz–20 kHz, −40…+20 dB, gridlines at 0/−40 dB and 100 Hz/1 k/10 k). Each first-order
@@ -468,7 +508,7 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
     colour `Palette::Trace` was added to `CCSLookAndFeel.h`.
   - **Known gap (cosmetic):** the spectrum plot blends with the `mix` param even for the Vibe, where
     **Vibrato mode forces 100 % wet** in the DSP — so with Vibrato on the drawn curve is flatter than what
-    is actually heard. `Palette::Trace` also currently duplicates `Palette::Screw`'s value.
+    is actually heard. Vibrato **defaults to on**, so this is the state the Vibe boots into, not an edge case.
 
 ---
 
@@ -580,8 +620,9 @@ peaks. Tuning by ear against reference phaser material still open for a later po
 - The LFO modulates the swept centre in the **log domain** over **200 Hz–2 kHz**; Depth scales the
   span, Rate sets speed — but the LFO waveform is **asymmetric** (owned by `VibeEffect`, not the shared
   `LFO`): warp-then-sine with `ASYM_K = 0.35`, giving the lamp/photocell *throb*.
-- **Chorus / Vibrato mode** (`vibeMode` bool): Chorus = dry+wet via Mix (swirl); Vibrato = 100 % wet
-  (the swept group delay reads as pitch wobble). Vibrato overrides the Mix knob to 1.0 in the DSP.
+- **Chorus / Vibrato mode** (`vibeMode` bool, **default on**): Chorus = dry+wet via Mix (swirl);
+  Vibrato = 100 % wet (the swept group delay reads as pitch wobble). Vibrato overrides the Mix knob to
+  1.0 in the DSP.
 - Stereo: reuses the per-channel LFO phase offset; Width scales it.
 
 | Param | Range | Notes |
@@ -589,7 +630,7 @@ peaks. Tuning by ear against reference phaser material still open for a later po
 | Rate | 0.05–5 Hz | LFO speed (per-effect) |
 | Depth | 0–100% | sweep span (per-effect) |
 | Mix | 0–100% | dry/wet (shared); **ignored in Vibrato mode** (forced 100 % wet) |
-| Vibrato | Off/On | mode switch: Off = Chorus (blend), On = Vibrato (100 % wet). `AudioParameterBool`, default Off |
+| Vibrato | Off/On | mode switch: Off = Chorus (blend), On = Vibrato (100 % wet). `AudioParameterBool`, **default On** (`VibeParameters::Vibrato = true`) — the Vibe boots as a vibrato, with Mix greyed out |
 | Stereo Width | 0–100% | L/R LFO phase offset (per-effect) |
 
 **Shipped M4:** functionally correct and RT-safe — all state (`m_AllPassState`) allocated in `Prepare`,
@@ -611,7 +652,7 @@ material is still open.
 - **Wow/flutter (M5b, runs first):** a modulated fractional delay (`juce::dsp::DelayLine<Lagrange3rd>`)
   whose delay is `(2 ms + 1.5 ms·mod·Age)`, where
   `mod = 0.8·wow(0.556 Hz) + 0.04·flutter(12 Hz) + 0.02·drift`. Wow/flutter are two `LFO` sines
-  (advanced per sample); `drift` is one `juce::Random` value per block, bipolar, one-pole-LPF'd at 2 Hz
+  (advanced per sample); `drift` is one `juce::Random` value per sample, bipolar, one-pole-LPF'd at 2 Hz
   with `1/√(coeff/2)` makeup. One shared `mod`/delay across channels (mono-correlated). Age 0 % ⇒ static
   2 ms delay (silent); 100 % ⇒ full wander. No feedback.
 - **Saturation:** `y = (tanh(drive·(x + BIAS)) − tanh(drive·BIAS)) · invS0` at 2× oversampling

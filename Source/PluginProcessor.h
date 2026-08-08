@@ -55,14 +55,14 @@ namespace CozyChorus
 		float GetVisualDelayInSamples() const { return m_VisualDelayInSamples.load(); }
 		EffectType GetActiveEffectType() const { return static_cast<EffectType>(static_cast<int>(m_EffectTypeParam->load())); }
 
-		juce::dsp::ProcessSpec& GetProcessSpec() { return m_ProcessSpec; }
+		const juce::dsp::ProcessSpec& GetProcessSpec() const { return m_ProcessSpec; }
 
 	private:
 		// Selects the effect matching the current effectType parameter.
 		ModulationEffect& GetActiveEffect();
 
 		juce::AudioProcessorValueTreeState m_APVTS;
-		juce::dsp::ProcessSpec m_ProcessSpec;
+		juce::dsp::ProcessSpec m_ProcessSpec{};
 
 		// One instance per effect will live here; M0 has only the pass-through.
 		NullEffect m_NullEffect;

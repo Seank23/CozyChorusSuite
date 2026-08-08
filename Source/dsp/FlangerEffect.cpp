@@ -2,14 +2,6 @@
 
 namespace CozyChorus
 {
-	FlangerEffect::FlangerEffect()
-	{
-	}
-
-	FlangerEffect::~FlangerEffect()
-	{
-	}
-
 	void FlangerEffect::Prepare(const juce::dsp::ProcessSpec& spec)
 	{
 		m_SampleRate = spec.sampleRate;
@@ -20,10 +12,9 @@ namespace CozyChorus
 
 		m_LFO.Prepare(m_SampleRate);
 
+		SetParameters(FlangerParameters{});
 		for (auto* smoothedVal : { &m_RateHz, &m_Depth, &m_Mix, &m_Width, &m_Feedback, &m_BaseDelayMs })
 			smoothedVal->reset(spec.sampleRate, 0.02);
-
-		SetParameters(FlangerParameters{});
 	}
 
 	void FlangerEffect::Process(const juce::dsp::ProcessContextReplacing<float>& context)
@@ -56,12 +47,15 @@ namespace CozyChorus
 				float channelWidthOffset = (ch == 0) ? 0.0f : widthOffset;
 				float lfo = m_LFO.GetValue(channelWidthOffset);
 				float lfoNormalised = 0.5f + 0.5f * lfo;
-				m_DelayInSamples = std::clamp(baseSample + sweepSample * lfoNormalised, MIN_DELAY_SAMPLES, static_cast<float>(m_MaxDelaySamples - 1));
+				const float delayInSamples = std::clamp(baseSample + sweepSample * lfoNormalised, MIN_DELAY_SAMPLES, static_cast<float>(m_MaxDelaySamples - 1));
 
-				float wetSample = m_DelayLine.popSample(ch, m_DelayInSamples, true);
+				float wetSample = m_DelayLine.popSample(ch, delayInSamples, true);
 				m_DelayLine.pushSample(ch, channelSample + feedback * wetSample);
 
 				block.getChannelPointer(ch)[n] = channelSample * (1.0f - mix) + wetSample * mix;
+
+				if (ch == 0)
+					m_ReferenceDelayInSamples = delayInSamples;
 			}
 			m_LFO.Advance();
 		}

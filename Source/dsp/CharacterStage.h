@@ -14,9 +14,6 @@ namespace CozyChorus
 	class CharacterStage
 	{
 	public:
-		CharacterStage();
-		~CharacterStage();
-
 		void Prepare(const juce::dsp::ProcessSpec& spec);
 		void Process(const juce::dsp::ProcessContextReplacing<float>& context);
 		void Reset();
@@ -35,7 +32,7 @@ namespace CozyChorus
 
 		juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> m_Warmth, m_Age;
 
-		float m_SampleRate = 44100.0f;
+		double m_SampleRate = 44100.0;
 		float m_NoiseCoeff = 0.0f;
 		float m_NoiseState = 0.0f;
 

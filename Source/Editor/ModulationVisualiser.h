@@ -41,7 +41,7 @@ namespace CozyChorus
 		juce::AudioProcessorValueTreeState& m_APVTS;
 		Mode m_Mode = Mode::Response;
 
-		float m_SampleRate = 44100.0f;
+		double m_SampleRate = 44100.0;
 		float m_Phase = 0.0f;
 		float m_DelayMs = 0.0f;
 		std::vector<float> m_Cutoffs;

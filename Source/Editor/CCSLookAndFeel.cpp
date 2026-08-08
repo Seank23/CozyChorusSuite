@@ -27,27 +27,25 @@ namespace CozyChorus
 		const float rx = centreX - radius;
 		const float ry = centreY - radius;
 		const float rw = radius * 2.0f;
-		float fwidth = (float)width;
-		float fheight = (float)height;
-		const float angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle) - juce::MathConstants<float>::pi;
+		const float angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
 
 		float thinkness = radius * 0.18f;
 
 		juce::Path trackArc;
-		trackArc.addCentredArc(centreX, centreY, rx, ry, 0.0f, rotaryStartAngle, rotaryEndAngle, true);
+		trackArc.addCentredArc(centreX, centreY, radius, radius, 0.0f, rotaryStartAngle, rotaryEndAngle, true);
 		g.setColour(Palette::Track);
 		g.strokePath(trackArc, juce::PathStrokeType(thinkness, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
 		juce::Path valueArc;
-		valueArc.addCentredArc(centreX, centreY, rx, ry, 0.0f, rotaryStartAngle, angle, true);
+		valueArc.addCentredArc(centreX, centreY, radius, radius, 0.0f, rotaryStartAngle, angle, true);
 		g.setColour(Palette::Accent);
 		g.strokePath(valueArc, juce::PathStrokeType(thinkness, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
 		g.setColour(Palette::KnobBody);
 		g.fillEllipse(juce::Rectangle<float>(rx, ry, rw, rw));
 
-		juce::Point<float> pointerStart = juce::Point<float>(centreX, centreY) - juce::Point(std::cos(angle - juce::MathConstants<float>::halfPi), std::sin(angle - juce::MathConstants<float>::halfPi)) * (radius - 10);
-		juce::Point<float> pointerEnd = juce::Point<float>(centreX, centreY) - juce::Point(std::cos(angle - juce::MathConstants<float>::halfPi), std::sin(angle - juce::MathConstants<float>::halfPi)) * radius;
+		juce::Point<float> pointerStart = juce::Point<float>(centreX, centreY) - juce::Point(std::cos(angle + juce::MathConstants<float>::halfPi), std::sin(angle + juce::MathConstants<float>::halfPi)) * (radius - 10);
+		juce::Point<float> pointerEnd = juce::Point<float>(centreX, centreY) - juce::Point(std::cos(angle + juce::MathConstants<float>::halfPi), std::sin(angle + juce::MathConstants<float>::halfPi)) * radius;
 		g.setColour(Palette::Accent);
 		g.drawLine(juce::Line<float>(pointerStart, pointerEnd), thinkness * 0.5f);
 	}

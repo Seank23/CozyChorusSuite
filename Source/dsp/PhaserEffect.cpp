@@ -2,14 +2,6 @@
 
 namespace CozyChorus
 {
-	PhaserEffect::PhaserEffect()
-	{
-	}
-
-	PhaserEffect::~PhaserEffect()
-	{
-	}
-
 	void PhaserEffect::Prepare(const juce::dsp::ProcessSpec& spec)
 	{
 		m_SampleRate = spec.sampleRate;
@@ -21,14 +13,13 @@ namespace CozyChorus
 		m_LogCenter = 0.5f * (logMin + logMax);
 		m_LogHalfSpan = 0.5f * (logMax - logMin);
 
-		for (auto* smoothedVal : { &m_RateHz, &m_Depth, &m_Mix, &m_Width, &m_Feedback })
-			smoothedVal->reset(m_SampleRate, 0.02);
-
 		for (auto& channelState : m_AllPassState)
 			channelState.fill(0.0f);
 		m_FeedbackState.fill(0.0f);
 
 		SetParameters(PhaserParameters{});
+		for (auto* smoothedVal : { &m_RateHz, &m_Depth, &m_Mix, &m_Width, &m_Feedback })
+			smoothedVal->reset(m_SampleRate, 0.02);
 	}
 
 	void PhaserEffect::Process(const juce::dsp::ProcessContextReplacing<float>& context)

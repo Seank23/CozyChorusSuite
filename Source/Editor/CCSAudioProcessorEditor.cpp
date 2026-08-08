@@ -90,6 +90,8 @@ namespace CozyChorus
 		m_VibeWidthAtt = std::make_unique<SliderAttachment>(m_APVTS, ParameterIDs::VibeWidth, m_VibeWidthKnob->getSlider());
 		m_VibeModeAtt = std::make_unique<ButtonAttachment>(m_APVTS, ParameterIDs::VibeMode, m_VibeModeButton);
 
+		m_LastEffectIndex = static_cast<int>(m_APVTS.getRawParameterValue(ParameterIDs::EffectType)->load());
+
 		startTimerHz(30);
 		setSize(560, 440);
 	}
@@ -137,13 +139,15 @@ namespace CozyChorus
 
 	void CCSAudioProcessorEditor::timerCallback()
 	{
-		const int idx = (int)m_APVTS.getRawParameterValue(ParameterIDs::EffectType)->load();
+		const int idx = static_cast<int>(m_APVTS.getRawParameterValue(ParameterIDs::EffectType)->load());
 		if (idx != m_LastEffectIndex)
+		{
 			m_LastEffectIndex = idx;
+			RenderComponents();
+		}
 
 		const bool isMixDead = m_LastEffectIndex == static_cast<int>(EffectType::Vibe) && m_APVTS.getRawParameterValue(ParameterIDs::VibeMode)->load() >= 0.5f;
 		m_MixKnob->getSlider().setEnabled(!isMixDead);
-		RenderComponents();
 	}
 
 	void CCSAudioProcessorEditor::HideAllEffectComponents()
@@ -189,7 +193,7 @@ namespace CozyChorus
 
 		HideAllEffectComponents();
 		auto activeComponents = GetActiveComponents();
-		size_t n = activeComponents.size();
+		int n = static_cast<int>(activeComponents.size());
 		float totalWidth = (n * kKnobWidth) + ((n - 1) * kGap);
 		float x = bottomRow.getCentreX() - (totalWidth / 2.0f);
 		for (auto* comp : activeComponents)

@@ -2,14 +2,6 @@
 
 namespace CozyChorus
 {
-	VibeEffect::VibeEffect()
-	{
-	}
-
-	VibeEffect::~VibeEffect()
-	{
-	}
-
 	void VibeEffect::Prepare(const juce::dsp::ProcessSpec& spec)
 	{
 		m_SampleRate = spec.sampleRate;
@@ -24,13 +16,12 @@ namespace CozyChorus
 		for (int s = 0; s < NUM_STAGES; ++s)
 			m_StageLogOffset[s] = STAGE_OFFSET[s] * std::log(2);
 
-		for (auto* smoothedVal : { &m_RateHz, &m_Depth, &m_Mix, &m_Width })
-			smoothedVal->reset(m_SampleRate, 0.02);
-
 		for (auto& channelState : m_AllPassState)
 			channelState.fill(0.0f);
 
 		SetParameters(VibeParameters{});
+		for (auto* smoothedVal : { &m_RateHz, &m_Depth, &m_Mix, &m_Width })
+			smoothedVal->reset(m_SampleRate, 0.02);
 	}
 
 	void VibeEffect::Process(const juce::dsp::ProcessContextReplacing<float>& context)

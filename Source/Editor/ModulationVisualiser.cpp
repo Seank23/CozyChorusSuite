@@ -45,7 +45,7 @@ namespace CozyChorus
 	{
 		if (event.mods.isLeftButtonDown())
 		{
-			m_Phase = 0.0f;
+			m_Phase = 0.0;
 			SetMode(m_Mode == Mode::LFO ? Mode::Response : Mode::LFO);
 		}
 	}
@@ -58,6 +58,9 @@ namespace CozyChorus
 
 	void ModulationVisualiser::UpdateVisualisation()
 	{
+		if (m_Processor.GetProcessSpec().sampleRate <= 0.0f)
+			return;
+
 		m_SampleRate = m_Processor.GetProcessSpec().sampleRate;
 		m_Phase = m_Processor.GetVisualPhase();
 		m_DelayMs = m_Processor.GetVisualDelayInSamples() / m_SampleRate * 1000.0f;
@@ -175,9 +178,7 @@ namespace CozyChorus
 		switch (type)
 		{
 		case EffectType::Chorus:
-			return std::sin(juce::MathConstants<float>::twoPi * phase);
 		case EffectType::Flanger:
-			return std::sin(juce::MathConstants<float>::twoPi * phase);
 		case EffectType::Phaser:
 			return std::sin(juce::MathConstants<float>::twoPi * phase);
 		case EffectType::Vibe:
@@ -234,8 +235,6 @@ namespace CozyChorus
 
 	float ModulationVisualiser::EvaluateTransferFunction(float frequency, EffectType type)
 	{
-		float depth = SampleDepth(type);
-
 		std::complex<float> aPrime;
 		switch (type)
 		{

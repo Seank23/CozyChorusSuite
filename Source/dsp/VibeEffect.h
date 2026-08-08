@@ -15,9 +15,6 @@ namespace CozyChorus
 	class VibeEffect : public ModulationEffect
 	{
 	public:
-		VibeEffect();
-		~VibeEffect();
-
 		virtual void Prepare(const juce::dsp::ProcessSpec& spec) override;
 		virtual void Process(const juce::dsp::ProcessContextReplacing<float>& context) override;
 		virtual void Reset() override;

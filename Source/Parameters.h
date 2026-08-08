@@ -127,13 +127,13 @@ namespace CozyChorus
 		layout.add(std::make_unique<juce::AudioParameterFloat>(
 			juce::ParameterID{ ParameterIDs::FlangerBaseDelay, 1 },
 			"Base Delay (ms)",
-			juce::NormalisableRange<float>(0.2f, 5.0f, 0.01f, 0.1f),
+			juce::NormalisableRange<float>(0.2f, 5.0f, 0.01f, 0.4f),
 			flangerParams.BaseDelayMs));
 		
 		layout.add(std::make_unique<juce::AudioParameterFloat>(
 			juce::ParameterID{ ParameterIDs::PhaserRate, 1 },
 			"Rate (Hz)",
-			juce::NormalisableRange<float>(0.05f, 5.0f, 0.05f, 0.35f),
+			juce::NormalisableRange<float>(0.05f, 5.0f, 0.05f, 0.4f),
 			phaserParams.RateHz));
 		layout.add(std::make_unique<juce::AudioParameterFloat>(
 			juce::ParameterID{ ParameterIDs::PhaserDepth, 1 },
@@ -158,7 +158,7 @@ namespace CozyChorus
 		layout.add(std::make_unique<juce::AudioParameterFloat>(
 			juce::ParameterID{ ParameterIDs::VibeRate, 1 },
 			"Rate (Hz)",
-			juce::NormalisableRange<float>(0.05f, 5.0f, 0.05f, 0.35f),
+			juce::NormalisableRange<float>(0.05f, 5.0f, 0.05f, 0.4f),
 			vibeParams.RateHz));
 		layout.add(std::make_unique<juce::AudioParameterFloat>(
 			juce::ParameterID{ ParameterIDs::VibeDepth, 1 },

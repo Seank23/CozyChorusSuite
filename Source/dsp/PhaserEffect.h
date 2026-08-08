@@ -16,9 +16,6 @@ namespace CozyChorus
 	class PhaserEffect : public ModulationEffect
 	{
 	public:
-		PhaserEffect();
-		~PhaserEffect();
-
 		virtual void Prepare(const juce::dsp::ProcessSpec& spec) override;
 		virtual void Process(const juce::dsp::ProcessContextReplacing<float>& context) override;
 		virtual void Reset() override;

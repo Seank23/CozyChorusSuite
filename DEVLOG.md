@@ -20,6 +20,130 @@ belongs here.
 
 ---
 
+## 2026-08-08 — Session 14: Code review, fix pass, and doc reconciliation
+
+Not a milestone — a review of the finished plugin, the fixes that came out of it, and a pass over
+`CLAUDE.md` to make it match the code again. Claude reviewed and advised; **the code changes in this entry
+were written by hand** (Claude edited only `CLAUDE.md` and this file).
+
+**Done — review:**
+- **Read all 26 files in `Source/`** against the JUCE 8.0.14 sources in the submodule (`SmoothedValue`,
+  `ProcessSpec`, `Oversampling`, `Path::addCentredArc`, `JUCE_SNAP_TO_ZERO`), and rebuilt the
+  `CozyChorusSuite` shared-code target in Debug to inventory compiler warnings.
+
+**Done — bugs found and fixed:**
+1. **Chorus emitted NaN for ~294 samples (6.7 ms @ 44.1 k) whenever it became the active effect.**
+   `Prepare` called `smoothedVal->reset(...)` **before** `SetParameters(ChorusParameters{})`. JUCE's
+   `reset(numSteps)` does `setCurrentAndTargetValue(this->target)` and a default
+   `SmoothedValue<float, Linear>` has `target == 0` (`juce_SmoothedValue.h:244,274`), so `m_Voices` ramped
+   **from 0**; `static_cast<int>` floored it to 0 until the ramp crossed 1.0, the voice loop never ran, and
+   `wetSum / voices` was `0.0f / 0` → **NaN** into the output block and on into `CharacterStage`.
+   `JUCE_SNAP_TO_ZERO` flushes NaN out of the downstream filter states, so it was a burst rather than a
+   permanent kill — but it fired on load (Chorus is the default effect) and again on every re-selection,
+   and would have failed `pluginval`. **Fixed** by moving `SetParameters` above the reset loop in all four
+   effects (with `stepsToTarget` still 0, `setTargetValue` snaps current to target, and the following
+   `reset` keeps it there), plus `voices = std::max(static_cast<int>(...), 1)` as a second line of defence.
+   Recorded as a **settled design decision** in `CLAUDE.md` — the ordering is load-bearing.
+2. **The rotary value arc never rendered.** `drawRotarySlider` passed `rx`/`ry` — the arc's bounding-box
+   **corner** — where `Path::addCentredArc` expects **radiusX/radiusY**. For the 60×66 rotary area that is
+   radii (4.5, 7.5) instead of (25.5, 25.5): a tiny ellipse centred on the knob, which the `fillEllipse`
+   below it then painted over. Stacked on that, the `- π` applied to `angle` (cancelled by the pointer
+   maths, so the pointer was right) was fed to the value arc as its **end angle**. **Fixed**: arcs now use
+   `radius, radius`, `angle` lost the `- π`, and the pointer switched to `angle + halfPi` — algebraically
+   the same direction as before (`(a - π) - π/2 ≡ a + π/2`), so the pointer is unchanged and the arcs are
+   now correct.
+3. **`m_ProcessSpec` was uninitialised.** `juce::dsp::ProcessSpec` has no default member initialisers
+   (`juce_ProcessContext.h:44-54`), so it held indeterminate values until `prepareToPlay`;
+   `ModulationVisualiser` read it in its constructor and every vblank and divided by it — `0.0f / 0.0f`
+   → NaN → `Path::lineTo` with NaN coords, which asserts in debug JUCE. **Fixed**: `m_ProcessSpec{}`,
+   `GetProcessSpec()` now returns a `const&`, and `UpdateVisualisation` bails on `sampleRate <= 0`.
+4. **The editor relaid out and re-showed every knob 30×/s.** `if (idx != m_LastEffectIndex) m_LastEffectIndex = idx;`
+   was a no-op and `RenderComponents()` ran unconditionally, so each visible knob went
+   `true → false → true` per tick with a `repaintParent()` on each transition (and mid-drag visibility
+   toggling is its own hazard). **Fixed**: re-render only on change, with `m_LastEffectIndex` seeded from
+   the parameter in the constructor so the first `resized()` already lays out the right effect.
+5. **`size_t` underflow on the first layout** — `n == 0` made `(n - 1) * kGap` wrap. **Fixed** by `int n`
+   (and made unreachable anyway by the seeding in 4).
+6. **The visualiser published the wrong delay tap** — see the dedicated section below.
+7. Smaller, all **fixed**: `useIntegerLatency = true` on the `Oversampling` ctor so the PDC figure is an
+   exact integer instead of a rounded fractional one; `m_SampleRate` promoted `float → double` in
+   `CharacterStage` and `ModulationVisualiser`; `CharacterStage::Process` now honours
+   `context.isBypassed` like the four effects do.
+8. **Dead code removed:** `fwidth`/`fheight`, the unused `depth` in `EvaluateTransferFunction`, the three
+   identical sine cases in `SampleShape` (collapsed to fallthrough), `kCellPadX/Y`, `kMaxColumns` and the
+   duplicate `kBackground/kTitleText/kCaptionText` in `EditorConstants.h` (which also moved out of an
+   anonymous namespace into `namespace CozyChorus` and dropped its JUCE include), and the empty
+   hand-written ctors/dtors in all five DSP classes.
+
+**Done — the delay tap the visualiser publishes (finding 6):**
+- M6b assigned `m_DelayInSamples` from inside the voice **and** channel loops, so it ended up holding the
+  **last voice on the last channel** — up to ±4 ms of voice spread and ~240° of LFO phase away from the
+  phase published beside it.
+- **Fix shipped:** write the member only under `if (ch == 0 && v == 0)` (Chorus) / `if (ch == 0)`
+  (Flanger). Rationale: **voice 0 on channel 0 is the only tap read at LFO phase offset `0.0f`** — the
+  same phase `GetCurrentLFOPhase()` publishes — so the Signal and LFO views stay in lock-step. The per-tap
+  local that M6b had replaced with the member is back and is what `popSample` receives, so the exported
+  value is literally (post-clamp) the number handed to the delay line, not a re-derivation. Renamed to
+  `m_ReferenceDelayInSamples`; kept a plain `float` because `GetDelayInSamples()` is only ever called from
+  `processBlock` (`PluginProcessor.cpp:174,176`), so the atomic boundary is already in the right place.
+- Accepted trade-off: voice 0's base delay is 20/18/16 ms at 1/2/3 voices, so the displayed offset steps
+  with the Voices knob.
+
+**Done — visual tuning (by ear, unrelated to the review):**
+- `kVisCyclesShown` 6 → **4**, `kVisPxPerMs` 2.0 → **1.0**.
+- Knob taper skews: Flanger Base Delay 0.1 → **0.4**; Phaser and Vibe Rate 0.35 → **0.4** (Chorus and
+  Flanger Rate left at 0.35).
+
+**Done — `CLAUDE.md` reconciled** (4 corrections, plus the Session 14 state):
+- **Vibrato defaults to ON** — `VibeParameters::Vibrato = true` feeds the APVTS default, so the Vibe boots
+  as a vibrato with Mix greyed out. The doc said "default Off" in three places. **The code is the intent;
+  the doc was wrong.** Fixed in the M4 param table, the M4 topology decision and the Vibe DSP reference.
+- **Wow/flutter drift is per *sample*, not per block** — `CharacterStage.cpp` draws a `juce::Random` value
+  inside the per-sample loop; the doc claimed per-block in three places. Code is again the right version:
+  the `1/√(coeff/2)` makeup is derived for white noise at sample rate, and a per-block draw would make the
+  drift block-size dependent. That reasoning is now written down so it does not get "corrected" back.
+- **`Palette::Screw` does not exist** — removed from the M6a palette list and from the open-cleanups list,
+  along with the claim that `Palette::Trace` duplicates its value.
+- **`m_ScreenZone` is already gone** from the editor header — removed from the open-cleanups list.
+- Open-cleanups and PDC/visualiser passages updated to the post-fix state; the new `Prepare` ordering rule
+  added under Settled design decisions.
+
+**Decisions:**
+- **Docs follow the code on both mismatches** (Vibrato default, per-sample drift) — the shipped behaviour
+  is what we want in both cases, so nothing in `Source/` changed for them.
+- **`docs/Milestone-*.md` guides are left untouched.** They are point-in-time implementation guides, not
+  state documents; `Milestone-4-Vibe-Guide.md:174` still sketches `Vibrato = false` and that is fine as
+  history. `CLAUDE.md` is the single source of truth for current state.
+
+**Next up:**
+- **Audition the fixes** — the `Prepare` reorder changes first-block behaviour for every effect (controls
+  now start *at* their values instead of ramping up from 0 over 20 ms), and the knob now draws a real
+  value arc. Neither has been heard/seen yet.
+- Then the still-open items below, then `pluginval`, Catch2 DSP tests, and the by-ear tuning passes (Vibe
+  stagger / `ASYM_K`, M5b weights).
+
+**Open questions / blockers:**
+- **Still open from the review:** mode-switch clicks (Vibe `effectiveMix` jumps 0.5→1.0 on the Vibrato
+  toggle; Phaser `m_Stages` changes instantly and stale state on removed stages is reused if the count
+  goes back up); smoothing the integer `Voices` count still only moves the click rather than removing it;
+  `MAX_CHANNELS = 2` unguarded in Phaser/Vibe (safe only because `isBusesLayoutSupported` rejects >2);
+  `LFO::SetShape` and its Triangle/Saw/Square branches unreachable; `thinkness` typo; `EditorConstants.h`
+  has no trailing newline.
+- **Warnings after the fix pass: 34 sites, all narrowing** — C4267 `size_t → int` from
+  `block.getNumChannels()/getNumSamples()` in every `Process`, C4244 `double → float` from `0.001 *
+  m_SampleRate` expressions, C4244 `int ↔ float` in the editor/visualiser paint paths — plus 5 C4100
+  unreferenced-parameter warnings in `drawComboBox`. The C4189 dead-variable ones are gone.
+- **The knob cap covers the inner half of the new value arc** (cap diameter is `radius * 2`, the arc is
+  stroked at `radius` with `radius * 0.18` thickness), so the arc reads as a thin outer ring. Worth a look
+  to decide whether the cap should shrink to ~`radius * 0.7`.
+- The spectrum plot still blends with `mix` even for the Vibe, where **Vibrato forces 100 % wet** — and
+  Vibrato is now confirmed as the *default*, so the wrong curve is the first thing a user sees on the Vibe.
+- Richer alternative for the delay export, deferred: publish **all** voice taps (array of atomics + count)
+  and draw one wet trace per voice, so the Signal view shows the ensemble honestly rather than one
+  representative tap.
+
+---
+
 ## 2026-08-08 — Session 13: Milestone 6b — Modulation visualiser (the screen comes alive)
 
 **Done:**
