@@ -6,6 +6,10 @@ switch, with a global tape "Character" stage on the output and a live modulation
 Built with C++20 / JUCE 8 / CMake. Ships as **VST3**, **Standalone**, and **AU** (macOS only).
 Guitar-oriented, works in mono and stereo, fully automatable, real-time safe.
 
+<p align="center">
+  <img width="500" height="418" alt="image" src="https://github.com/user-attachments/assets/809aa198-d1ac-45a7-806e-cd6b61aa5291" />
+</p>
+
 ---
 
 ## Contents
