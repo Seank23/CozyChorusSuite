@@ -21,10 +21,8 @@ namespace CozyChorus
 		m_LogCenter = 0.5f * (logMin + logMax);
 		m_LogHalfSpan = 0.5f * (logMax - logMin);
 
-		constexpr float ln2 = 0.6931472f;
-		const std::array<float, NUM_STAGES> octaveOffset{ -0.75f, -0.25f, 0.25f, 0.75f };
 		for (int s = 0; s < NUM_STAGES; ++s)
-			m_StageLogOffset[s] = octaveOffset[s] * ln2;
+			m_StageLogOffset[s] = STAGE_OFFSET[s] * std::log(2);
 
 		for (auto* smoothedVal : { &m_RateHz, &m_Depth, &m_Mix, &m_Width })
 			smoothedVal->reset(m_SampleRate, 0.02);
@@ -44,10 +42,10 @@ namespace CozyChorus
 		const int numChannels = block.getNumChannels();
 		const int numSamples = block.getNumSamples();
 
-		m_LFO.SetFrequency(m_RateHz.getNextValue());
-
 		for (int n = 0; n < numSamples; ++n)
 		{
+			m_LFO.SetFrequency(m_RateHz.getNextValue());
+
 			float depth = m_Depth.getNextValue();
 			float mix = m_Mix.getNextValue();
 			float width = m_Width.getNextValue();

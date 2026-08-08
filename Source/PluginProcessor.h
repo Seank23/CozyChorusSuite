@@ -51,11 +51,18 @@ namespace CozyChorus
 
 		juce::AudioProcessorValueTreeState& GetAPVTS() { return m_APVTS; }
 
+		float GetVisualPhase() const { return m_VisualPhase.load(); }
+		float GetVisualDelayInSamples() const { return m_VisualDelayInSamples.load(); }
+		EffectType GetActiveEffectType() const { return static_cast<EffectType>(static_cast<int>(m_EffectTypeParam->load())); }
+
+		juce::dsp::ProcessSpec& GetProcessSpec() { return m_ProcessSpec; }
+
 	private:
 		// Selects the effect matching the current effectType parameter.
 		ModulationEffect& GetActiveEffect();
 
 		juce::AudioProcessorValueTreeState m_APVTS;
+		juce::dsp::ProcessSpec m_ProcessSpec;
 
 		// One instance per effect will live here; M0 has only the pass-through.
 		NullEffect m_NullEffect;
@@ -92,6 +99,9 @@ namespace CozyChorus
 		std::atomic<float>* m_VibeDepthParam = nullptr;
 		std::atomic<float>* m_VibeWidthParam = nullptr;
 		std::atomic<float>* m_VibeModeParam = nullptr;
+
+		std::atomic<float> m_VisualPhase{ 0.0f };
+		std::atomic<float> m_VisualDelayInSamples{ 0.0f };
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 	};

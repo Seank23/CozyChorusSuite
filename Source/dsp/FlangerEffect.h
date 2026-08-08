@@ -25,12 +25,16 @@ namespace CozyChorus
 
 		void SetParameters(const FlangerParameters& params);
 
+		float GetDelayInSamples() const { return m_DelayInSamples; }
+
 	private:
 		juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> m_DelayLine;
 
 		juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> m_RateHz, m_Depth, m_Mix, m_Width, m_Feedback, m_BaseDelayMs;
 
 		int m_MaxDelaySamples = 0;
+
+		float m_DelayInSamples = 0.0f;
 
 		static constexpr float MAX_DELAY_MS = 15.0f;
 		static constexpr float MAX_SWEEP_MS = 5.0f;

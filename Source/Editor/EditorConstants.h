@@ -22,6 +22,8 @@ namespace
 	constexpr int kKnobHeight = 100;
 	constexpr float kCornerRadius = 4.0f;
 	constexpr float kCornerRadiusSmall = 2.0f;
+	constexpr int kVisCyclesShown = 6;
+	constexpr float kVisPxPerMs = 2.0f;
 
 	// Cozy, warm palette.
 	const juce::Colour kBackground{ 0xff2a2320 };

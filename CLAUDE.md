@@ -10,18 +10,26 @@ C++20 / JUCE 8 / CMake.
 
 ## Current status
 
-- **Phase:** Milestone 6a complete — **the plugin now wears a flat-vector "guitar-pedal" UI.** All four
-  effects plus the global Character stage (tape warmth *and* tape age) were finished by M5b; **M6a is the
-  first pure-GUI milestone**: a custom `CCSLookAndFeel` (cozy amber-on-brown skin, no image assets), a
-  reusable `LabeledKnob` composite, and a fixed **560×440 zone layout** — Mix top-left, a framed
-  **CHARACTER** box (Warmth + Age) top-right, the active effect's controls centred in a bottom row, and a
-  reserved recessed **"screen"** in the centre awaiting the **M6b** animated LFO visualiser. DSP is
-  unchanged — 6a is view-only. Chorus + Flanger (delay-line family) and Phaser + **Vibe** (all-pass
-  family) finished the DSP-effect track at M4; **M5 added a global `CharacterStage`** (oversampled
-  asymmetric-tanh saturation + high-cut tone, one **Warmth** macro) applied to the output after the
-  active effect; **M5b added tape-age wow/flutter** to that same stage — a modulated fractional delay
-  (slow **wow** + fast **flutter** + band-limited random drift) driven by a second **Age** macro,
-  running *before* the saturation. Only the **M6b LFO visualiser** remains.
+- **Phase:** Milestone 6b complete — **the plugin is feature-complete: all planned DSP and all planned GUI
+  are shipped.** The centre "screen" reserved by M6a now hosts a live **`ModulationVisualiser`** with two
+  click-toggled modes: **LFO** (the active effect's modulation waveform, scrolling in lock-step with the
+  real DSP phase, amplitude ∝ Depth) and **Response** (family-adaptive — dry/wet sinusoids offset by the
+  live delay for Chorus/Flanger, an analytic swept-notch **magnitude spectrum** for Phaser/Vibe). The
+  audio→GUI hand-off is two lock-free `std::atomic<float>`s published once per block. M6a had given the
+  plugin its flat-vector "guitar-pedal" face: a custom `CCSLookAndFeel` (cozy amber-on-brown skin, no
+  image assets), a reusable `LabeledKnob` composite, and a fixed **560×440 zone layout** — Mix top-left, a
+  framed **CHARACTER** box (Warmth + Age) top-right, the active effect's controls centred in a bottom row.
+  Chorus + Flanger (delay-line family) and Phaser + **Vibe** (all-pass family) finished the DSP-effect
+  track at M4; **M5 added a global `CharacterStage`** (oversampled asymmetric-tanh saturation + high-cut
+  tone, one **Warmth** macro) applied to the output after the active effect; **M5b added tape-age
+  wow/flutter** to that same stage — a modulated fractional delay (slow **wow** + fast **flutter** +
+  band-limited random drift) driven by a second **Age** macro, running *before* the saturation. Nothing on
+  the original milestone list remains; further work is polish (by-ear tuning, `pluginval`, DSP tests).
+- **M6b was *not* purely view-only** (unlike 6a): besides the read-only visualiser exports, the LFO rate
+  update `m_LFO.SetFrequency(m_RateHz.getNextValue())` moved from **once per block to once per sample** in
+  all four effects — the Rate smoother now actually runs at sample rate (previously it advanced one step
+  per block, stretching the 20 ms ramp by the block size). Audible only as smoother/faster Rate changes;
+  the steady-state sound is unchanged.
 - **Params are per-effect (post-M4):** Rate / Depth / Stereo Width were split from shared params into
   **per-effect** APVTS params (`chorusRate`, `flangerRate`, …), so each effect carries its own defaults.
   **`mix` is the only shared *effect* param**; **`warmth`** and **`age`** are separate **global stage**
@@ -32,8 +40,9 @@ C++20 / JUCE 8 / CMake.
   is **deliberately not** PDC-reported (it is a time-varying pitch-modulation delay, part of the effect,
   not a fixed processing latency).
 - A hand-written **`CCSAudioProcessorEditor`** (rotary knobs + effect selector, per-effect control
-  visibility) has replaced the generic editor, now skinned by a custom **`CCSLookAndFeel`** and laid out
-  as a guitar-pedal faceplate (M6a). Only the **LFO visualiser** (M6b) is still deferred.
+  visibility) has replaced the generic editor, skinned by a custom **`CCSLookAndFeel`**, laid out as a
+  guitar-pedal faceplate (M6a) and animated by the **`ModulationVisualiser`** in the centre screen (M6b).
+  No GUI work from the milestone list remains.
 - Builds as **VST3 + Standalone** via CMake + JUCE **8.0.14** with the `Visual Studio 18 2026`
   generator (MSVC v145). Artefacts land in
   `build/CozyChorusSuite_artefacts/<config>/{Standalone,VST3}/`.
@@ -149,8 +158,13 @@ Fixed order (delay-line family first, then all-pass family):
    the active effect's controls **centred** in a bottom row (replacing the wrap-at-4 grid). Mix is
    greyed (`setEnabled(false)`) in Vibe's Vibrato mode. Lifetime-safe: `m_LookAndFeel` declared
    first, `setLookAndFeel(nullptr)` in the destructor.
-9. **Milestone 6b — LFO visualiser. Next.** The animated LFO curve rendered into the reserved centre
-   `m_ScreenZone` (a `ModulationVisualiser` view, possibly OpenGL). The only remaining GUI work.
+9. **Milestone 6b — Modulation visualiser. ✅ Done.** The live animated view in the centre screen zone: a
+   `ModulationVisualiser` (plain `juce::Component` + `juce::VBlankAttachment`, **no OpenGL**) with two
+   click-toggled modes — **LFO** (the active effect's modulation waveform scrolling on the real DSP phase)
+   and **Response** (dry/wet sinusoid pair offset by the live delay for Chorus/Flanger; an analytic
+   swept-notch magnitude spectrum for Phaser/Vibe). Fed by two lock-free atomics published from
+   `processBlock` (`m_VisualPhase`, `m_VisualDelayInSamples`). Last item on the milestone list —
+   **the plugin is feature-complete**; anything further is polish.
 
 ---
 
@@ -204,15 +218,16 @@ own naming, and the **JUCE submodule is never restyled**.
 
 ```
 Source/
-  PluginProcessor.h / .cpp   // AudioProcessor: owns APVTS + effect instances + CharacterStage; routes processBlock to active effect, then runs the Character stage on the output; reports oversampler latency via setLatencySamples
+  PluginProcessor.h / .cpp   // AudioProcessor: owns APVTS + effect instances + CharacterStage; routes processBlock to active effect, then runs the Character stage on the output; reports oversampler latency via setLatencySamples; publishes the M6b visualiser atomics (phase + delay) and caches the ProcessSpec for the GUI
   Parameters.h               // parameter IDs + APVTS layout in one place
   Editor/
-    CCSAudioProcessorEditor.h / .cpp  // custom editor: effect selector + LabeledKnobs, per-effect control visibility (30 Hz Timer), pedal zone layout (header / Mix / CHARACTER box / reserved screen / centred bottom row); owns the CCSLookAndFeel; createEditor() returns this
-    CCSLookAndFeel.h / .cpp  // custom juce::LookAndFeel_V4 skin (M6a): drawRotarySlider / drawComboBox / drawPopupMenuBackground / drawToggleButton + the shared Palette namespace (flat-vector amber-on-brown, no assets)
+    CCSAudioProcessorEditor.h / .cpp  // custom editor: effect selector + LabeledKnobs, per-effect control visibility (30 Hz Timer), pedal zone layout (header / Mix / CHARACTER box / visualiser / centred bottom row); owns the CCSLookAndFeel + the ModulationVisualiser; createEditor() returns this
+    CCSLookAndFeel.h / .cpp  // custom juce::LookAndFeel_V4 skin (M6a): drawRotarySlider / drawComboBox / drawPopupMenuBackground / drawToggleButton + the shared Palette namespace (flat-vector amber-on-brown, no assets; Palette::Trace added in M6b for the dry curve)
     LabeledKnob.h / .cpp     // reusable composite view (M6a): a caption Label stacked over a rotary Slider with a value read-out; getSlider() exposes the inner slider for APVTS attachment
-    EditorConstants.h        // shared layout metrics (kMargin, kHeaderHeight, zone widths, kKnobWidth/Height, corner radii) read by BOTH resized() and paint()
+    ModulationVisualiser.h / .cpp  // the centre-screen animated view (M6b): juce::Component + VBlankAttachment; Mode::LFO (modulation waveform on the live DSP phase) / Mode::Response (dry-vs-delayed sinusoids for Chorus+Flanger, analytic magnitude spectrum for Phaser+Vibe); click toggles the mode
+    EditorConstants.h        // shared layout metrics (kMargin, kHeaderHeight, zone widths, kKnobWidth/Height, corner radii, kVisCyclesShown/kVisPxPerMs) read by BOTH resized() and paint()
   dsp/
-    ModulationEffect.h       // abstract base: Prepare(spec) / Process(context) / Reset()
+    ModulationEffect.h       // abstract base: Prepare(spec) / Process(context) / Reset(); + GetCurrentLFOPhase() (M6b, read-only export for the visualiser)
     NullEffect.h             // pass-through; now ONLY the `default` guard in GetActiveEffect() — every built effect routes to itself
     LFO.h / .cpp             // shared LFO: continuous phase, per-channel phase-offset reads, Hz rate; sine/triangle/saw/square (Chorus/Flanger/Phaser use sine); GetPhase() accessor lets Vibe apply its own asymmetric shape
     ChorusEffect.h / .cpp    // Chorus (delay-line family) — Milestone 1, done
@@ -391,13 +406,69 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
   - **Mix greyed in Vibrato:** the timer also reads `vibeMode`; when the Vibe is active **and** Vibrato is
     on, `m_MixKnob->getSlider().setEnabled(false)` renders Mix via the disabled path (it is ignored in the
     DSP there) without removing it from the layout.
-  - **Deferred to M6b:** the animated LFO curve inside `m_ScreenZone`. 6a paints that rectangle as a
-    static recessed screen only.
-  - **Open cleanups (not blockers):** `EditorConstants.h` still carries the pre-M6a grid constants
-    (`kMaxColumns`, `kCellPad*`) and a duplicate `kBackground/kTitleText/kCaptionText` colour set now
-    superseded by `Palette` — dead once M6b lands. `timerCallback()` calls `RenderComponents()` every tick
-    (full relayout at 30 Hz) rather than only on change; harmless on the message thread. `Palette::Screw`
-    + screw metrics are defined but not yet drawn.
+  - **Deferred to M6b (now delivered):** the animated curve inside the screen rect. 6a painted that
+    rectangle as a static recessed placeholder; M6b replaced it with the `ModulationVisualiser`, which
+    draws its own recess.
+  - **Open cleanups (not blockers, still open after M6b):** `EditorConstants.h` still carries the pre-M6a
+    grid constants (`kMaxColumns`, `kCellPad*`) and a duplicate `kBackground/kTitleText/kCaptionText`
+    colour set superseded by `Palette`; `m_ScreenZone` is still **declared** in the editor header but no
+    longer assigned (the visualiser owns those bounds now). `timerCallback()` calls `RenderComponents()`
+    every tick (full relayout at 30 Hz) rather than only on change; harmless on the message thread.
+    `Palette::Screw` + screw metrics are defined but not yet drawn.
+
+- **Modulation visualiser (M6b) — the centre screen comes alive.** One new view
+  (`Source/Editor/ModulationVisualiser.h/.cpp`) plus a small read-only export surface on the DSP side.
+  `Parameters.h` is untouched — **no new parameter**; the visualiser is pure view state.
+  - **Audio → GUI hand-off (lock-free, one store per block):** `PluginProcessor` keeps two
+    `std::atomic<float>`s — `m_VisualPhase` and `m_VisualDelayInSamples` — stored at the **end** of
+    `processBlock` with `std::memory_order_relaxed`, and exposes `GetVisualPhase()`,
+    `GetVisualDelayInSamples()`, `GetActiveEffectType()` and `GetProcessSpec()`. The `juce::dsp::ProcessSpec`
+    was promoted from a local in `prepareToPlay` to the member `m_ProcessSpec` so the GUI can read the live
+    sample rate. No locks, no allocation, no new latency; the GUI never touches DSP objects.
+  - **Read-only DSP exports:** `ModulationEffect::GetCurrentLFOPhase()` on the **base** covers all four
+    effects in one line (`m_LFO` is a base member); `ChorusEffect`/`FlangerEffect` gained
+    `GetDelayInSamples()`, backed by a new `m_DelayInSamples` member that replaces what used to be a local
+    `delaySample` inside the per-sample loop. `PhaserEffect::MIN_FC_HZ/MAX_FC_HZ`,
+    `VibeEffect::NUM_STAGES/MIN_FC_HZ/MAX_FC_HZ/STAGE_OFFSET` and `VibeEffect::GetAsymmetricShape` were
+    promoted from private to **public** (the last one to `static`) so the view derives its curves from the
+    **same constants and shape function as the DSP** rather than duplicating magic numbers. Vibe's
+    `Prepare` now builds `m_StageLogOffset` from the shared `STAGE_OFFSET` table.
+  - **Real DSP change (6b is *not* view-only, unlike 6a):** `m_LFO.SetFrequency(m_RateHz.getNextValue())`
+    moved **inside** the per-sample loop in Chorus, Flanger, Phaser and Vibe. It had been called once per
+    block, so the Rate smoother advanced one step per block and its 20 ms ramp was effectively stretched by
+    the block size; it now runs at sample rate like every other smoothed control.
+  - **Animation driver: `juce::VBlankAttachment`, not a `Timer`** — the callback fires on the display's
+    vsync, so the curve is smooth and repaints can't outpace the screen. Each frame it re-reads the sample
+    rate, phase and delay, then `repaint()`s. **No OpenGL** (the M6a note that it "possibly" would be is
+    resolved: plain `juce::Graphics` paths are fast enough at this size).
+  - **Two modes, click to toggle:** `Mode::LFO` and `Mode::Response` (default **Response**), swapped in
+    `mouseDown` with a pointing-hand cursor; a corner caption names the current view ("LFO" / "Signal" /
+    "Spectrum"). Mode is **view state only** — not a parameter, not persisted.
+  - **LFO mode:** `kVisCyclesShown = 6` cycles across the width, drawn from the published phase so it
+    scrolls in lock-step with the DSP (and **freezes when the host stops processing** — a useful tell).
+    Amplitude ∝ that effect's Depth param; shape per effect — sine for Chorus/Flanger/Phaser,
+    `VibeEffect::GetAsymmetricShape` for the Vibe throb.
+  - **Response mode is family-adaptive**, mirroring the two DSP families:
+    - **Delay family (Chorus, Flanger)** — a dry sinusoid (`Palette::Trace`) and a wet copy
+      (`Palette::Accent`) shifted horizontally by the **live** delay at `kVisPxPerMs = 2 px/ms`, so the
+      modulation is read directly as a breathing time offset. No filtering maths involved.
+    - **All-pass family (Phaser, Vibe)** — the **analytic** magnitude response of the wet/dry sum on a log
+      frequency axis (50 Hz–20 kHz, −40…+20 dB, gridlines at 0/−40 dB and 100 Hz/1 k/10 k). Each first-order
+      all-pass contributes phase `−2·atan(f/fc)`; Phaser uses `A = e^{jφ}` with `φ = stages·(−2 atan(f/fc))`
+      wrapped by feedback as `A' = A/(1 − fb·A)`, Vibe sums the four staggered stage phases (no feedback);
+      then `H = mix·A' + (1 − mix)` and `20·log10|H|`. Cutoffs come from
+      `EvaluateCutoffFrequency`, which repeats the DSP's own log-domain sweep
+      (`exp(logCenter + logHalfSpan·depth·shape)`, clamped) — **no FFT, no audio buffer is ever sent to the
+      GUI**; the notches move because the published phase moves.
+  - **Editor wiring:** the visualiser is a `std::unique_ptr` member constructed with the `PluginProcessor&`;
+    `RenderComponents()` hands it the centre remainder directly (`setBounds(area)`) and `paint()` no longer
+    draws the screen placeholder — the component paints its own recessed screen. `CCSAudioProcessorEditor.h`
+    now **forward-declares** `LabeledKnob` and `ModulationVisualiser` and includes their headers only in the
+    `.cpp`. New shared metrics `kVisCyclesShown` / `kVisPxPerMs` live in `EditorConstants.h`; the dry trace
+    colour `Palette::Trace` was added to `CCSLookAndFeel.h`.
+  - **Known gap (cosmetic):** the spectrum plot blends with the `mix` param even for the Vibe, where
+    **Vibrato mode forces 100 % wet** in the DSP — so with Vibrato on the drawn curve is flatter than what
+    is actually heard. `Palette::Trace` also currently duplicates `Palette::Screw`'s value.
 
 ---
 
@@ -419,7 +490,10 @@ now **per-effect** APVTS params (each with its own default), plus a shared **Mix
 ## DSP reference (per effect)
 
 **Shared LFO:** sine/triangle, rate range **0.05–5 Hz**, per-channel phase offset for stereo
-width, continuous phase across blocks.
+width, continuous phase across blocks. `GetPhase()` exposes the running phase; `ModulationEffect` re-exports
+it as `GetCurrentLFOPhase()` for the M6b visualiser. **Since M6b, `SetFrequency(m_RateHz.getNextValue())` is
+called per sample** in all four effects (it was once per block, which stretched the Rate smoother's 20 ms
+ramp by the block size).
 
 ### Chorus (Milestone 1)
 - `input --> modulated fractional delay line --> wet`; `output = dry*(1-mix) + wet*mix`.
@@ -522,7 +596,9 @@ peaks. Tuning by ear against reference phaser material still open for a later po
 Rate/Depth/Mix/Width smoothed over 20 ms, LFO phase advanced **once per sample**, no allocation in
 `Process`. Stages fixed at 4 (no `Stages` param); **no feedback** path at all — the Vibe can't ring, so
 `Reset()` only flushes the all-pass state. The asymmetric shape lives in `VibeEffect::GetAsymmetricShape`
-(the shared `LFO` gained only a generic `GetPhase()` accessor). Editor adds a **"Vibrato" toggle button**
+(the shared `LFO` gained only a generic `GetPhase()` accessor) — **public + `static` since M6b**, alongside
+`NUM_STAGES`, `MIN_FC_HZ`, `MAX_FC_HZ` and the `STAGE_OFFSET` table (and `PhaserEffect::MIN_FC_HZ/MAX_FC_HZ`),
+so the visualiser plots the sweep from the DSP's own constants. Editor adds a **"Vibrato" toggle button**
 shown only for the Vibe (5 controls: 4 knobs — its Rate/Depth/Width + the shared Mix — plus the toggle). Stagger spread (`±0.75` octave)
 and `ASYM_K` are **tuned by ear, not measured** — a by-ear polish pass against reference Uni-Vibe
 material is still open.

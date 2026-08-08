@@ -25,6 +25,8 @@ namespace CozyChorus
 		// Clear internal state without reallocating.
 		virtual void Reset() = 0;
 
+		float GetCurrentLFOPhase() const { return m_LFO.GetPhase(); }
+
 	protected:
 		LFO m_LFO;
 		double m_SampleRate = 44100.0;

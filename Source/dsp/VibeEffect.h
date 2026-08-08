@@ -24,8 +24,14 @@ namespace CozyChorus
 
 		void SetParameters(const VibeParameters& params);
 
+		static float GetAsymmetricShape(float phase);
+
+		static constexpr int NUM_STAGES = 4;
+		static constexpr float MIN_FC_HZ = 200.0f;
+		static constexpr float MAX_FC_HZ = 2000.0f;
+		static constexpr std::array<float, NUM_STAGES> STAGE_OFFSET{ -0.75f, -0.25f, 0.25f, 0.75f };
+
 	private:
-		float GetAsymmetricShape(float phase);
 
 		juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> m_RateHz, m_Depth, m_Mix, m_Width;
 		bool m_Vibrato = false;
@@ -33,10 +39,7 @@ namespace CozyChorus
 		float m_LogCenter = 0.0f;
 		float m_LogHalfSpan = 0.0f;
 
-		static constexpr int NUM_STAGES = 4;
 		static constexpr int MAX_CHANNELS = 2;
-		static constexpr float MIN_FC_HZ = 200.0f;
-		static constexpr float MAX_FC_HZ = 2000.0f;
 		static constexpr float ASYM_K = 0.35f;
 
 		std::array<float, NUM_STAGES> m_StageLogOffset{};

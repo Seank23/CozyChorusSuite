@@ -35,10 +35,10 @@ namespace CozyChorus
 		const int numChannels = block.getNumChannels();
 		const int numSamples = block.getNumSamples();
 
-		m_LFO.SetFrequency(m_RateHz.getNextValue());
-
 		for (int n = 0; n < numSamples; n++)
 		{
+			m_LFO.SetFrequency(m_RateHz.getNextValue());
+
 			float depth = m_Depth.getNextValue();
 			float mix = m_Mix.getNextValue();
 			float width = m_Width.getNextValue();
@@ -59,9 +59,9 @@ namespace CozyChorus
 					float lfo = m_LFO.GetValue(voicePhase);
 					float voiceBaseMs = m_BaseDelayMs + (v - (voices - 1) * 0.5f) * 4.0f;
 					float baseSample = voiceBaseMs * 0.001 * m_SampleRate;
-					float delaySample = std::clamp(baseSample + lfo * depthSample, 0.0f, static_cast<float>(m_MaxDelaySamples - 1));
+					m_DelayInSamples = std::clamp(baseSample + lfo * depthSample, 0.0f, static_cast<float>(m_MaxDelaySamples - 1));
 					bool last = (v == voices - 1);
-					wetSum += m_DelayLine.popSample(ch, delaySample, last);
+					wetSum += m_DelayLine.popSample(ch, m_DelayInSamples, last);
 				}
 				float wetSample = wetSum / voices;
 				block.getChannelPointer(ch)[n] = channelSample * (1.0f - mix) + wetSample * mix;

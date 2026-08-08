@@ -25,6 +25,9 @@ namespace CozyChorus
 
 		void SetParameters(const PhaserParameters& params);
 
+		static constexpr float MIN_FC_HZ = 200.0f;
+		static constexpr float MAX_FC_HZ = 2000.0f;
+
 	private:
 		juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> m_RateHz, m_Depth, m_Mix, m_Width, m_Feedback;
 		int m_Stages = 6;
@@ -34,8 +37,6 @@ namespace CozyChorus
 
 		static constexpr int MAX_STAGES = 12;
 		static constexpr int MAX_CHANNELS = 2;
-		static constexpr float MIN_FC_HZ = 200.0f;
-		static constexpr float MAX_FC_HZ = 2000.0f;
 
 		std::array<std::array<float, MAX_STAGES>, MAX_CHANNELS> m_AllPassState{};
 		std::array<float, MAX_CHANNELS> m_FeedbackState{};

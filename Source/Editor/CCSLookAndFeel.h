@@ -13,7 +13,7 @@ namespace CozyChorus
 		const juce::Colour KnobBody{ 0xff3d322c };	  // flat knob cap
 		const juce::Colour Track{ 0xff4c3f38 };		  // unfilled arc
 		const juce::Colour Accent{ 0xffe0975a };	  // warm amber: value arc, pointer, lit LED  (fork §)
-		const juce::Colour Screw{ 0xff5a4c42 };
+		const juce::Colour Trace{ 0xff5a4c42 };
 	}
 
 	class CCSLookAndFeel : public juce::LookAndFeel_V4

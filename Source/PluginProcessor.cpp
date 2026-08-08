@@ -39,17 +39,16 @@ namespace CozyChorus
 
 	void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 	{
-		juce::dsp::ProcessSpec spec{};
-		spec.sampleRate = sampleRate;
-		spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
-		spec.numChannels = static_cast<juce::uint32>(getTotalNumOutputChannels());
+		m_ProcessSpec.sampleRate = sampleRate;
+		m_ProcessSpec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
+		m_ProcessSpec.numChannels = static_cast<juce::uint32>(getTotalNumOutputChannels());
 
-		m_NullEffect.Prepare(spec);
-		m_ChorusEffect.Prepare(spec);
-		m_FlangerEffect.Prepare(spec);
-		m_PhaserEffect.Prepare(spec);
-		m_VibeEffect.Prepare(spec);
-		m_CharacterStage.Prepare(spec);
+		m_NullEffect.Prepare(m_ProcessSpec);
+		m_ChorusEffect.Prepare(m_ProcessSpec);
+		m_FlangerEffect.Prepare(m_ProcessSpec);
+		m_PhaserEffect.Prepare(m_ProcessSpec);
+		m_VibeEffect.Prepare(m_ProcessSpec);
+		m_CharacterStage.Prepare(m_ProcessSpec);
 
 		setLatencySamples(m_CharacterStage.GetLatencySamples());
 
@@ -81,7 +80,7 @@ namespace CozyChorus
 	{
 		// Read the selection lock-free. Every type maps to the pass-through for now;
 		// later milestones return the matching effect from these cases.
-		const auto type = static_cast<EffectType>(static_cast<int>(m_EffectTypeParam->load()));
+		const auto type = GetActiveEffectType();
 
 		switch (type)
 		{
@@ -109,7 +108,7 @@ namespace CozyChorus
 		juce::dsp::AudioBlock<float> block(buffer);
 		juce::dsp::ProcessContextReplacing<float> context(block);
 
-		const auto type = static_cast<EffectType>(static_cast<int>(m_EffectTypeParam->load()));
+		const auto type = GetActiveEffectType();
 
 		switch (type)
 		{
@@ -161,13 +160,22 @@ namespace CozyChorus
 		}
 		}
 
-		GetActiveEffect().Process(context);
+		auto& effect = GetActiveEffect();
+		effect.Process(context);
 
 		CharacterStageParameters charParams{};
 		charParams.Warmth = std::clamp(m_WarmthParam->load() / 100.0f, 0.0f, 1.0f);
 		charParams.Age = std::clamp(m_AgeParam->load() / 100.0f, 0.0f, 1.0f);
 		m_CharacterStage.SetParameters(charParams);
 		m_CharacterStage.Process(context);
+
+		m_VisualPhase.store(effect.GetCurrentLFOPhase(), std::memory_order_relaxed);
+		if (type == EffectType::Chorus)
+			m_VisualDelayInSamples.store(m_ChorusEffect.GetDelayInSamples(), std::memory_order_relaxed);
+		else if (type == EffectType::Flanger)
+			m_VisualDelayInSamples.store(m_FlangerEffect.GetDelayInSamples(), std::memory_order_relaxed);
+		else
+			m_VisualDelayInSamples.store(0.0f, std::memory_order_relaxed);
 	}
 
 	juce::AudioProcessorEditor* PluginProcessor::createEditor()

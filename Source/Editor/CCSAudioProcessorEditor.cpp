@@ -1,5 +1,7 @@
 #include "CCSAudioProcessorEditor.h"
 #include "EditorConstants.h"
+#include "LabeledKnob.h"
+#include "ModulationVisualiser.h"
 
 namespace CozyChorus
 {
@@ -9,6 +11,9 @@ namespace CozyChorus
 		setLookAndFeel(&m_LookAndFeel);
 		addAndMakeVisible(m_EffectSelector);
 		m_EffectSelector.addItemList(GetEffectTypeChoices(), 1);
+
+		m_ModulationVisualiser = std::make_unique<ModulationVisualiser>(m_Processor);
+		addAndMakeVisible(m_ModulationVisualiser.get());
 
 		m_MixKnob = std::make_unique<LabeledKnob>("Mix");
 		addAndMakeVisible(m_MixKnob.get());
@@ -123,14 +128,6 @@ namespace CozyChorus
 		graphics.setFont(juce::Font(juce::FontOptions(12.0f)));
 		auto captionBounds = characterBounds.removeFromTop(kCaptionHeight);
 		graphics.drawText("Character", captionBounds, juce::Justification::centred);
-
-		// Screen
-		graphics.setColour(Palette::Screen);
-		graphics.fillRoundedRectangle(m_ScreenZone.toFloat(), kCornerRadiusSmall);
-		graphics.setColour(juce::Colours::black.withAlpha(0.25f));
-		graphics.drawRoundedRectangle(m_ScreenZone.toFloat().reduced(1.0f), kCornerRadiusSmall, 1.0f);
-		graphics.setColour(Palette::CaptionText.withAlpha(0.5f));
-		graphics.drawText("Screen", m_ScreenZone.removeFromTop(kCaptionHeight), juce::Justification::centred);
 	}
 
 	void CCSAudioProcessorEditor::resized()
@@ -180,7 +177,7 @@ namespace CozyChorus
 		area.removeFromBottom(kGap);
 		auto mixZone = area.removeFromLeft(kMixZoneWidth);
 		m_CharacterZone = area.removeFromRight(kCharacterZoneWidth);
-		m_ScreenZone = area; // remaining space in the middle
+		m_ModulationVisualiser->setBounds(area); // remaining space in the middle
 
 		m_EffectSelector.setBounds(header.reduced(kGap).removeFromRight(kSelectorWidth));
 		m_MixKnob->setBounds(mixZone.withSizeKeepingCentre(kKnobWidth, kKnobHeight));

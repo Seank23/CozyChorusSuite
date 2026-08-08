@@ -40,10 +40,10 @@ namespace CozyChorus
 		const int numChannels = block.getNumChannels();
 		const int numSamples = block.getNumSamples();
 
-		m_LFO.SetFrequency(m_RateHz.getNextValue());
-
 		for (int n = 0; n < numSamples; ++n)
 		{
+			m_LFO.SetFrequency(m_RateHz.getNextValue());
+
 			float depth = m_Depth.getNextValue();
 			float mix = m_Mix.getNextValue();
 			float width = m_Width.getNextValue();

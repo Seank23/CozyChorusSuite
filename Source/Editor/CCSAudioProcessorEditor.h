@@ -1,12 +1,14 @@
 #pragma once
 #include "../PluginProcessor.h"
 #include "CCSLookAndFeel.h"
-#include "LabeledKnob.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
 namespace CozyChorus
 {
+	class LabeledKnob;
+	class ModulationVisualiser;
+
 	class CCSAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::Timer
 	{
 	public:
@@ -24,12 +26,14 @@ namespace CozyChorus
 
 		CCSLookAndFeel m_LookAndFeel;
 
+		std::unique_ptr<ModulationVisualiser> m_ModulationVisualiser;
+
 		using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
 		using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
 		using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
 
 		PluginProcessor& m_Processor;
-		juce::AudioProcessorValueTreeState& m_APVTS; // = m_Processor.GetAPVTS()
+		juce::AudioProcessorValueTreeState& m_APVTS;
 
 		juce::ComboBox m_EffectSelector;
 		std::unique_ptr<LabeledKnob> m_MixKnob, m_WarmthKnob, m_AgeKnob;
@@ -53,7 +57,6 @@ namespace CozyChorus
 		std::unique_ptr<ButtonAttachment> m_VibeModeAtt;
 
 		juce::Rectangle<int> m_CharacterZone;
-		juce::Rectangle<int> m_ScreenZone;
 
 		int m_LastEffectIndex = -1;
 

@@ -24,10 +24,14 @@ namespace CozyChorus
 
 		void SetParameters(const ChorusParameters& params);
 
+		float GetDelayInSamples() const { return m_DelayInSamples; }
+
 	private:
 		juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd> m_DelayLine;
 
 		juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> m_RateHz, m_Depth, m_Mix, m_Width, m_Voices;
+
+		float m_DelayInSamples = 0.0f;
 
 		float m_BaseDelayMs = 20.0f;
 		int m_MaxDelaySamples = 0;
