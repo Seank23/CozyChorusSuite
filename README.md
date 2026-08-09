@@ -85,15 +85,15 @@ tape-style pitch instability (**Age**) followed by saturation and a high-cut (**
 ## Signal flow
 
 ```
-                     ┌─── one of ──────────────────────────────────┐
+                     ┌─── one of ───────────────────────────────────┐
                      │  Chorus  │  Flanger  │  Phaser  │  Vibe      │
- input ──────────────┤  (dry/wet blended by Mix inside the effect)  ├──┐
-                     └─────────────────────────────────────────────┘  │
+ input ──────────────┤  (dry/wet blended by Mix inside the effect)  ├─┐
+                     └──────────────────────────────────────────────┘ │
                                                                       ▼
-                        ┌──────────────── Character (always on) ────────────────┐
+                        ┌──────────────── Character (always on) ────────────────────────────────┐
                         │  wow/flutter delay  →  2× up  →  asym. tanh  →  2× down  →  high-cut  │
                         │        (Age)                    (Warmth)               (Warmth)       │
-                        └───────────────────────────────────────────────────────┘
+                        └───────────────────────────────────────────────────────────────────────┘
                                                                       │
                                                                       ▼
                                                                    output
@@ -106,7 +106,7 @@ output stage, not part of any one effect.
 
 ## Installing
 
-Pre-built binaries are not distributed; build from source (below), then:
+See latest release, or build from source (below), then:
 
 **VST3 (Windows)** — copy
 `build/CozyChorusSuite_artefacts/<config>/VST3/CozyChorus Suite.vst3`
@@ -408,8 +408,6 @@ names and signatures are kept as JUCE spells them; the JUCE submodule is never r
 - **`CLAUDE.md`** — the living project brief: architecture, settled design decisions, milestone list,
   and the DSP reference for every effect.
 - **`DEVLOG.md`** — session-by-session log (newest first): what was done, what was decided, what's next.
-- **`docs/Milestone-*.md`** — per-milestone implementation guides, one for each effect plus the
-  Character stage, the pedal UI and the visualiser.
 - **`CPP-STYLE-GUIDE.md`** — house C++ style.
 
 ---
