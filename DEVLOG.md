@@ -20,6 +20,87 @@ belongs here.
 
 ---
 
+## 2026-08-09 — Session 15: pluginval wired up
+
+Not a milestone — tooling. The `pluginval` validation step that had sat under "Optional/later" in
+`CLAUDE.md` since M0 is now a first-class, one-command gate. No DSP, editor or parameter code was
+touched; the plugin binary is byte-for-byte what Session 14 left behind.
+
+**Done:**
+- **`scripts/Run-Pluginval.ps1`** (new) — downloads Tracktion **pluginval v1.0.4** into `tools/pluginval/`
+  on first use, runs it against the VST3 in the build tree, echoes the log and exits with pluginval's own
+  code (0 = pass, 1 = fail). Params: `-Config Debug|Release` (default Release), `-Strictness 1..10`
+  (default 5), `-TimeoutMs` (default 300000), `-SampleRates`, `-BlockSizes`, `-Repeat`, `-Randomise`,
+  `-SkipGuiTests`, `-PluginPath`, `-ForceDownload`, and the common `-Verbose` mapped onto `--verbose`.
+  Written to Windows PowerShell **5.1**-compatible syntax so it runs under either `pwsh` or the in-box
+  shell.
+- **`CMakeLists.txt`** — a `Validate` custom target (`pwsh -File Run-Pluginval.ps1 -Config $<CONFIG>`),
+  deliberately **not** in `ALL`, `USES_TERMINAL` so output streams live, with
+  `add_dependencies(Validate CozyChorusSuite_VST3)` so it can never validate a stale binary. Guarded by
+  `if(WIN32)` and a `find_program(COZY_POWERSHELL NAMES pwsh powershell)`. Sits at the solution root
+  next to `Docs`.
+- **`.gitignore`** — `/tools/`, so the downloaded binary is never committed.
+- **`CLAUDE.md`** — new *Validation (pluginval)* subsection under Build commands; the Tech-stack line no
+  longer lists pluginval as optional.
+
+**Results — the plugin passes `pluginval` clean at BOTH strictness 5 and strictness 10 (Release VST3).**
+Strictness 5: 18 test groups, `SUCCESS`. **Strictness 10: 24 test groups, `SUCCESS`** — the extra six are
+*Non-releasing audio processing*, *Plugin state restoration*, *Parameters*, *Background thread state*,
+**Parameter thread safety** and **Fuzz parameters**. Audio processing and Automation ran the full default
+matrix (44.1/48/96 kHz × 64/128/256/512/1024 = 15 pairs each; Automation adds a 32-sample sub-block).
+
+Worth calling out, because each maps onto a known hazard in this codebase:
+- **No NaN/Inf/subnormal findings.** The Session 14 Chorus `wetSum / voices` NaN would have been caught
+  here — this is now a standing regression guard for it.
+- **Fuzz parameters + Parameter thread safety passed.** That machinery hammers `effectType`, `vibeMode`
+  and `phaserStages` from off-thread, i.e. precisely the mode-switch paths still on the open list. They
+  don't crash or produce bad samples — the remaining concern there is *audible clicks*, which pluginval
+  does not and cannot measure.
+- **Editor + Open editor whilst processing + Editor Automation passed**, so the `CCSLookAndFeel` lifetime
+  rule (declared-first / `setLookAndFeel(nullptr)`) and the `VBlankAttachment` teardown hold up under
+  repeated open/close while audio runs.
+- **Bus tests enumerated exactly the Mono/Stereo pair** `isBusesLayoutSupported` advertises, and restored
+  the default 2-in/2-out layout cleanly. This is what keeps the unguarded `MAX_CHANNELS = 2` in
+  Phaser/Vibe out of reach — the constraint is enforced at the layout-negotiation boundary, not in the
+  effects, and that boundary is now verified.
+- **Plugin state restoration passed**, so the APVTS save/load round-trip survives repeated restores.
+
+**Decisions:**
+- **Two Windows quirks are handled in the script, not left to the caller.** `pluginval.exe` is a JUCE
+  **GUI-subsystem** binary, so PowerShell does *not* block on it — a bare `& pluginval.exe …` returns
+  instantly and looks like a no-op. **Piping the output forces the wait** (the stdout handle only closes
+  at process exit). For the same reason `--output-dir` is always passed and the log is echoed as a
+  fallback if nothing reaches stdout. In practice this build *does* write to the console, but the
+  fallback costs nothing and survives a future pluginval repackaging.
+- **Release is the default target, not Debug.** Debug is slow enough to trip timeouts and a JUCE
+  `jassert` there opens a **modal dialog that hangs an unattended run**. Debug validation is for when
+  you're attached to a debugger, chasing a specific failure.
+- **`Validate` stays out of `ALL`.** A strictness-10 sweep runs for minutes across 15 rate/block pairs —
+  a gate you invoke, not a tax on every build.
+- **`$<CONFIG>`, not `CMAKE_BUILD_TYPE`.** Visual Studio is a multi-config generator, so the
+  configuration isn't known at configure time; the generator expression resolves at build time. It is
+  kept out of `COMMENT`, where generator-expression support varies across the CMake version range.
+
+**Next up:**
+- Adopt `-Strictness 10 -Repeat 3 -Randomise` as the pre-release ritual — repeats with a shuffled test
+  order are what shake out order-dependent state bugs that a single ordered pass can miss.
+- pluginval says nothing about *sound*, so the by-ear polish passes still open (Vibe stagger/`ASYM_K`
+  against reference Uni-Vibe material, Character weights, Phaser tuning) are unaffected by this green run.
+
+**Open questions / blockers:**
+- **`Reported latency: 0` in the Plugin info test.** Expected rather than alarming — that test runs
+  before `prepareToPlay`, and `setLatencySamples(m_CharacterStage.GetLatencySamples())` only fires there,
+  so pluginval is reading the pre-prepare value. Worth confirming against a host that re-queries after
+  preparation before calling the PDC path proven.
+- The **vst3 validator** step is skipped (`--vst3validator` path unset). Steinberg's own `validator.exe`
+  ships with the VST3 SDK; wiring it in would add another layer, but it isn't vendored here.
+- Still unaddressed from Session 14, and **not** something pluginval flags: mode-switch clicks (Vibe
+  `effectiveMix` 0.5→1.0 on the Vibrato toggle; Phaser `m_Stages` changing instantly with stale state
+  reused on regrown stages), the spectrum-vs-Vibrato blend gap, and the ~34 narrowing warnings
+  (C4244/C4267) plus 5 unreferenced-parameter warnings in `drawComboBox`.
+
+---
+
 ## 2026-08-08 — Session 14: Code review, fix pass, and doc reconciliation
 
 Not a milestone — a review of the finished plugin, the fixes that came out of it, and a pass over

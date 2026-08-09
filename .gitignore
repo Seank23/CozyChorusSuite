@@ -2,6 +2,9 @@
 /build/
 out/
 
+# Downloaded tooling (pluginval, fetched on demand by scripts/Run-Pluginval.ps1)
+/tools/
+
 # Claude Code local settings
 .claude/settings.local.json
 

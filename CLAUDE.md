@@ -24,7 +24,14 @@ C++20 / JUCE 8 / CMake.
   tone, one **Warmth** macro) applied to the output after the active effect; **M5b added tape-age
   wow/flutter** to that same stage — a modulated fractional delay (slow **wow** + fast **flutter** +
   band-limited random drift) driven by a second **Age** macro, running *before* the saturation. Nothing on
-  the original milestone list remains; further work is polish (by-ear tuning, `pluginval`, DSP tests).
+  the original milestone list remains; further work is polish (by-ear tuning, DSP tests).
+- **Session 15 wired up `pluginval` and the plugin passes clean at strictness 10** (Release VST3, 24 test
+  groups, `SUCCESS` — including *Parameter thread safety*, *Fuzz parameters* and *Plugin state
+  restoration*, over 44.1/48/96 kHz × 64–1024-sample blocks). One command:
+  `./scripts/Run-Pluginval.ps1 -Strictness 10`, or the CMake `Validate` target — see *Validation
+  (pluginval)* under Build commands. Note this validates **behaviour, not sound**: the remaining
+  open items are the by-ear tuning passes and the mode-switch **clicks** (audible, not a validation
+  failure), which pluginval cannot measure.
 - **Session 14 was a code-review + fix pass, not a milestone** (see the DEVLOG entry for the full finding
   list). Two real defects were found and fixed: the Chorus emitted **NaN** for ~294 samples whenever it
   became the active effect (`Prepare` reset the smoothers *before* `SetParameters`, so `m_Voices` ramped
@@ -191,7 +198,8 @@ Fixed order (delay-line family first, then all-pass family):
   `FirstOrderTPTFilter`, `SmoothedValue`.
 - Parameters via **`AudioProcessorValueTreeState` (APVTS)** — host automation, preset
   save/load, thread-safe reads.
-- Optional/later: **pluginval** validation step, **Catch2** DSP tests.
+- **pluginval** validation is wired up (Session 15) — see *Validation* below. **Catch2** DSP tests
+  are still optional/later.
 
 ### Toolchain (Windows dev box, confirmed 2026-07-14)
 
@@ -212,6 +220,28 @@ cmake --build build --config Debug     # or Release
 
 JUCE writes binaries under `build/<target>_artefacts/<config>/<Format>/`
 (e.g. `build/CozyChorusSuite_artefacts/Debug/Standalone/CozyChorus Suite.exe`).
+
+### Validation (pluginval)
+
+`scripts/Run-Pluginval.ps1` validates the built VST3 with **Tracktion pluginval**. It downloads
+pluginval into `tools/pluginval/` on first use (gitignored — the binary is never committed), runs it,
+and returns pluginval's exit code (**0 = all tests passed, 1 = a failure**).
+
+```powershell
+./scripts/Run-Pluginval.ps1                                    # Release, strictness 5
+./scripts/Run-Pluginval.ps1 -Strictness 10 -Repeat 3 -Randomise # the release gate
+./scripts/Run-Pluginval.ps1 -SampleRates 48000 -BlockSizes 256  # fast iteration loop
+cmake --build build --config Release --target Validate          # same, via CMake / Solution Explorer
+```
+
+Logs land in `build/pluginval-logs/<config>/`. Key parameters: `-Config Debug|Release`,
+`-Strictness 1..10`, `-TimeoutMs`, `-SampleRates`, `-BlockSizes`, `-Repeat`, `-Randomise`,
+`-SkipGuiTests` (CI only), `-PluginPath`, `-ForceDownload`, and `-Verbose` (maps to `--verbose`).
+
+**Validate Release, not Debug** — Debug is slow enough to trip timeouts, and a JUCE `jassert` there
+opens a modal dialog that hangs a headless run. Use Debug only when attached to a debugger.
+Strictness **5** is pluginval's default and the floor for host compatibility; **10** adds parameter
+fuzzing and repeated state restoration. Windows-only (it fetches the `pluginval_Windows.zip` asset).
 
 ---
 

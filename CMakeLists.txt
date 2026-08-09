@@ -24,9 +24,9 @@ if(APPLE)
 endif()
 
 juce_add_plugin(CozyChorusSuite
-    COMPANY_NAME                "Seank23"
-    BUNDLE_ID                   com.seank23.CozyChorusSuite
-    PLUGIN_MANUFACTURER_CODE    Sk23
+    COMPANY_NAME                "CozyChorus"
+    BUNDLE_ID                   com.CozyChorus.CozyChorusSuite
+    PLUGIN_MANUFACTURER_CODE    Cozy
     PLUGIN_CODE                 Cczs
     FORMATS                     ${COZY_FORMATS}
     PRODUCT_NAME                "CozyChorus Suite"
@@ -122,3 +122,44 @@ add_custom_target(Docs SOURCES ${COZY_ROOT_DOCS} ${COZY_SUB_DOCS})
 # Root docs (CLAUDE.md, DEVLOG.md, ...) sit at the project root; the docs/ folder
 # gets its own filter mirroring the on-disk layout.
 source_group("docs" FILES ${COZY_SUB_DOCS})
+
+# ---------------------------------------------------------------------------
+# Validate project (pluginval)
+#
+# On-demand target that runs Tracktion pluginval against the freshly built VST3.
+# Deliberately NOT in ALL: a strictness-10 sweep runs for minutes across every
+# sample-rate/block-size pair, so it is a gate you invoke, not part of a normal
+# build. Run it from Solution Explorer (Validate -> Build) or with
+#   cmake --build build --config Release --target Validate
+#
+# $<CONFIG> is a generator expression, resolved at BUILD time rather than
+# configure time -- required because Visual Studio is a multi-config generator,
+# so CMAKE_BUILD_TYPE is empty here and the chosen configuration is only known
+# once you press build. It is kept out of COMMENT, where generator expressions
+# are not supported on all CMake versions in range.
+#
+# Windows-only: the script fetches the pluginval_Windows.zip release asset.
+# ---------------------------------------------------------------------------
+if(WIN32)
+    set(COZY_PLUGINVAL_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/Run-Pluginval.ps1")
+
+    # Prefer PowerShell 7 (pwsh); fall back to the in-box Windows PowerShell.
+    # The script stays 5.1-compatible so either works.
+    find_program(COZY_POWERSHELL NAMES pwsh powershell)
+
+    if(COZY_POWERSHELL)
+        add_custom_target(Validate
+            COMMAND "${COZY_POWERSHELL}" -NoProfile -ExecutionPolicy Bypass
+                    -File "${COZY_PLUGINVAL_SCRIPT}" -Config $<CONFIG>
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            COMMENT "Running pluginval against the VST3..."
+            VERBATIM
+            USES_TERMINAL
+            SOURCES "${COZY_PLUGINVAL_SCRIPT}")
+
+        # Validating a stale binary is worse than useless, so build first.
+        add_dependencies(Validate CozyChorusSuite_VST3)
+    else()
+        message(STATUS "PowerShell not found - skipping the 'Validate' (pluginval) target.")
+    endif()
+endif()

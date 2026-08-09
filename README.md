@@ -10,6 +10,10 @@ Guitar-oriented, works in mono and stereo, fully automatable, real-time safe.
   <img width="500" height="418" alt="image" src="https://github.com/user-attachments/assets/809aa198-d1ac-45a7-806e-cd6b61aa5291" />
 </p>
 
+**Validation:** the VST3 passes [pluginval](https://github.com/Tracktion/pluginval) cleanly at
+**strictness level 10** — all 24 test groups, including parameter fuzzing, parameter thread safety
+and repeated state restoration. See [Validating](#validating-pluginval).
+
 ---
 
 ## Contents
@@ -19,6 +23,7 @@ Guitar-oriented, works in mono and stereo, fully automatable, real-time safe.
 - [Signal flow](#signal-flow)
 - [Installing](#installing)
 - [Building from source](#building-from-source)
+- [Validating (pluginval)](#validating-pluginval)
 - [The interface](#the-interface)
 - [The modulation visualiser](#the-modulation-visualiser)
 - [Parameter reference](#parameter-reference)
@@ -79,6 +84,8 @@ tape-style pitch instability (**Age**) followed by saturation and a high-cut (**
   avoid zipper noise, and LFO phase is continuous across blocks.
 - **Full host integration** — every control is an APVTS parameter, so automation, preset save/load
   and host state recall all work; the plugin reports its oversampler latency for delay compensation.
+- **Validated** — passes `pluginval` at strictness 10 with no findings, across sample rates
+  44.1/48/96 kHz and block sizes 64–1024. One command, or a CMake target.
 
 ---
 
@@ -165,6 +172,59 @@ build/CozyChorusSuite_artefacts/<config>/VST3/CozyChorus Suite.vst3
 `Source/` is globbed with `CONFIGURE_DEPENDS`, so new source files are picked up on the next build
 without editing CMake. In Visual Studio, `CozyChorusSuite_Standalone` is set as the startup project,
 so F5 launches the standalone app.
+
+---
+
+## Validating (pluginval)
+
+The build ships with a one-command validation step built on Tracktion's
+**[pluginval](https://github.com/Tracktion/pluginval)** — the de-facto standard conformance checker
+for JUCE plugins, and the same tool many hosts' vetting processes use.
+
+```powershell
+./scripts/Run-Pluginval.ps1                                     # Release, strictness 5
+./scripts/Run-Pluginval.ps1 -Strictness 10                      # full strictness
+./scripts/Run-Pluginval.ps1 -Strictness 10 -Repeat 3 -Randomise # the pre-release ritual
+cmake --build build --config Release --target Validate          # same, via CMake / Solution Explorer
+```
+
+The script downloads pluginval into `tools/pluginval/` on first use (gitignored — the binary is never
+committed), runs it against the VST3 in the build tree, echoes the log, and exits with pluginval's own
+code: **0 = every test passed, 1 = a failure**. Logs are written to `build/pluginval-logs/<config>/`.
+The `Validate` CMake target depends on the VST3 target, so it can never validate a stale binary.
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `-Config` | `Release` | `Debug` is slow enough to trip timeouts, and a JUCE assertion there opens a modal dialog that hangs an unattended run. Validate Debug only when attached to a debugger. |
+| `-Strictness` | `5` | 1–10. 5 is pluginval's own default and the floor for host compatibility; 10 adds parameter fuzzing and repeated state restoration. |
+| `-TimeoutMs` | `300000` | Abort if no test produces output for this long. `-1` disables. |
+| `-SampleRates` / `-BlockSizes` | full matrix | Narrow them for a fast iteration loop, e.g. `-SampleRates 48000 -BlockSizes 256`. |
+| `-Repeat` / `-Randomise` | off | Repeated, shuffled passes shake out order-dependent state bugs. |
+| `-SkipGuiTests` | off | For headless CI only — locally the editor tests are worth running. |
+| `-PluginPath` / `-ForceDownload` / `-Verbose` | — | Override the plugin under test, re-fetch pluginval, pass `--verbose`. |
+
+### Current result
+
+**`SUCCESS` at strictness 10** on the Release VST3 — 24 test groups, no findings. The groups that
+matter most for a modulation plugin:
+
+| Test group | What it proves here |
+|---|---|
+| Audio processing / Non-releasing audio processing | No NaNs, infinities or subnormals in the output across 44.1/48/96 kHz × 64/128/256/512/1024-sample blocks. |
+| Automation | Parameter changes at 32-sample sub-block granularity stay clean — no zipper, no invalid samples. |
+| Parameter thread safety / Fuzz parameters | Every parameter, including the effect selector and the Vibe's mode switch, can be hammered from off-thread without crashing or corrupting output. |
+| Plugin state / Plugin state restoration | The APVTS tree survives repeated save/restore round-trips. |
+| Editor / Open editor whilst processing / Editor Automation | The editor opens, closes and animates repeatedly while audio runs. |
+| Bus tests | The advertised mono/stereo layouts negotiate and restore correctly. |
+
+**What this does and doesn't tell you:** pluginval checks *behaviour and host conformance*, not
+*sound*. A clean run means the plugin won't crash, glitch, emit invalid samples or misbehave in a
+host — it says nothing about whether the Vibe's throb is convincing. The by-ear tuning items in
+[Known limitations](#known-limitations) are unaffected by it, as are the mode-switch clicks, which are
+audible artefacts rather than validation failures.
+
+pluginval is Windows/macOS/Linux, but `Run-Pluginval.ps1` currently fetches the Windows release asset
+only.
 
 ---
 
@@ -358,14 +418,21 @@ Honest list of what's still rough — none of these are crashes or dropouts:
   drawn curve is flatter than what you actually hear. Cosmetic only.
 - **Flanger sweeps upward only** from Base Delay, so its top-end reach is limited compared with a
   bipolar sweep. Through-zero flanging is not implemented.
-- **Phaser/Vibe assume at most 2 channels** — consistent with the supported mono/stereo layouts, but
-  the limit is a fixed array bound rather than a guarded one.
+- **Phaser/Vibe assume at most 2 channels** — consistent with the supported mono/stereo layouts (and
+  the bus negotiation that enforces them is verified by `pluginval`), but the limit is a fixed array
+  bound rather than a guarded one.
 - **Chorus voice-count stepping.** Voice 0's base delay is 20/18/16 ms at 1/2/3 voices, so the
   visualiser's displayed offset steps when you turn the Voices knob.
 - **Tuning is by ear.** The Vibe's stagger spread and asymmetry constant, the Character stage's drive/
   bias/cutoff endpoints, and the wow/flutter weights were all tuned by listening, not measured
   against reference hardware.
-- No `pluginval` run or automated DSP test suite yet.
+- **No automated DSP test suite** (Catch2 unit tests) yet. `pluginval` covers host conformance and
+  catches invalid output, but nothing asserts that, say, the Phaser's notches land where the maths
+  says they should.
+
+Note that the first four items are **not** things `pluginval` flags — it validates behaviour and host
+conformance, and the plugin passes it cleanly at maximum strictness. Clicks, cosmetic plot mismatches
+and voicing choices sit outside what any conformance checker measures.
 
 ---
 
@@ -392,6 +459,10 @@ Source/
     PhaserEffect                All-pass family, N-stage cascade + feedback
     VibeEffect                  All-pass family, 4 staggered stages + asymmetric LFO
     CharacterStage              Global tape stage (not a ModulationEffect)
+
+scripts/
+  Run-Pluginval.ps1             Fetches and runs pluginval against the built VST3; backs the
+                                CMake `Validate` target
 ```
 
 Parameters reach the DSP as plain per-effect structs (`ChorusParameters`, `FlangerParameters`, …)
